@@ -1,0 +1,39 @@
+#include "Client.hpp"
+
+Client::Client() : _fd(-1), _isRegistered(false), _nickname(""), _username(""), _realname("") {}
+Client::~Client() {}
+int Client::getFd() const {
+	return _fd;
+}
+bool Client::getIsRegistered() const {
+	return _isRegistered;
+}
+std::string Client::getNickname() const {
+	return _nickname;
+}
+std::string Client::getUsername() const {
+	return _username;
+}
+std::string Client::getRealname() const {
+	return _realname;
+}
+int Client::setFd(int fd) {
+	this->_fd = fd;
+	return 0;
+}
+int Client::setIsRegistered(bool isRegistered) {
+	this->_isRegistered = isRegistered;
+	return 0;
+}
+int Client::setNickname(std::string nickname) {
+	this->_nickname = nickname;
+	return 0;
+}
+int Client::setUsername(std::string username) {
+	this->_username = username;
+	return 0;
+}
+int Client::setRealname(std::string realname) {
+	this->_realname = realname;
+	return 0;
+}
