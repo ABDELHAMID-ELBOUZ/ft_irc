@@ -37,3 +37,23 @@ int Client::setRealname(std::string realname) {
 	this->_realname = realname;
 	return 0;
 }
+
+Client::Client(const Client &other) {
+	this->_fd = other._fd;
+	this->_isRegistered = other._isRegistered;
+	this->_nickname = other._nickname;
+	this->_username = other._username;
+	this->_realname = other._realname;
+}
+
+Client &Client::operator=(const Client &other) {
+	if (this != &other) {
+		this->_fd = other._fd;
+		this->_isRegistered = other._isRegistered;
+		this->_nickname = other._nickname;
+		this->_username = other._username;
+		this->_realname = other._realname;
+	}
+	return *this;
+}
+

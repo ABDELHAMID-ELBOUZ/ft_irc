@@ -23,5 +23,7 @@ class Client {
 		int setRealname(std::string realname);
 		Client();
 		~Client();
+		Client(const Client &other);
+		Client &operator=(const Client &other);
 };
 #endif

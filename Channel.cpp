@@ -25,3 +25,14 @@ bool Channel::hasMember(Client* client) const {
 Channel::Channel(const std::string& Name) : _name(Name), _topic("") {}
 
 Channel::~Channel() {}
+Channel::Channel(const Channel &other) : _name(other._name), _topic(other._topic), _members(other._members) {
+}
+
+Channel &Channel::operator=(const Channel &other) {
+    if (this != &other) {
+        this->_name = other._name;
+        this->_topic = other._topic;
+        this->_members = other._members;
+    }
+    return *this;
+}

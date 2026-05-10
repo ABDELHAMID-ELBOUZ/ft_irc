@@ -19,7 +19,8 @@ class Channel {
         const std::vector<Client*>& getMembers() const;
         Channel(const std::string& Name);
         ~Channel();
-    
+        Channel(const Channel &other);
+        Channel &operator=(const Channel &other);
 };
 
 #endif
