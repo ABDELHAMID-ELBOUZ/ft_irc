@@ -2,10 +2,12 @@
 #include "Channel.hpp"
 Server::Server(const std::string& password, int port) : _password(password), _port(port) 
 {
+
 }
 
 Server::~Server() 
 {
+
 }
 
 int Server::getPort() const 
@@ -18,7 +20,14 @@ const std::string Server::getPassword() const
 	return _password;
 }
 
-Server::Server(const Server &other) : _password(other._password), _port(other._port) {
+size_t Server::getClientCount() const 
+{
+	return _clients.size();
+}
+
+Server::Server(const Server &other) : _password(other._password), _port(other._port) 
+{
+
 }
 
 Server &Server::operator=(const Server &other) 
@@ -41,6 +50,15 @@ Client* Server::findClientByFd(int fd)
 	}
 	return NULL;
 }
-void Server::addToChannel(Channel &ch, Client &client) {
+void Server::addToChannel(Channel &ch, Client &client) 
+{
 	ch.addMember(&client);
+}
+
+
+
+std::ostream &operator<<(std::ostream &os, const Server &server) 
+{
+	os << "Server Port: " << server.getPort() << ", Password: " << server.getPassword() << ", Clients: " << server.getClientCount();
+	return os;
 }

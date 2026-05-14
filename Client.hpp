@@ -2,6 +2,7 @@
 #define CLIENT_HPP
 
 #include <string>
+#include <ostream>
 
 class Client {
 	private:
@@ -11,6 +12,10 @@ class Client {
 		std::string _username;
 		std::string _realname;
 	public:
+		Client();
+		~Client();
+		Client(const Client &other);
+		Client &operator=(const Client &other);
 		int getFd() const;
 		bool getIsRegistered() const;
 		std::string getNickname() const;
@@ -21,9 +26,10 @@ class Client {
 		int setNickname(std::string nickname);
 		int setUsername(std::string username);
 		int setRealname(std::string realname);
-		Client();
-		~Client();
-		Client(const Client &other);
-		Client &operator=(const Client &other);
+		bool operator==(const Client &other) const;
+		bool operator!=(const Client &other) const;
+
 };
+
+std::ostream &operator<<(std::ostream &os, const Client &client);
 #endif

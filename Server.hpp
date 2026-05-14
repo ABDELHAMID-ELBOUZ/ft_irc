@@ -17,10 +17,13 @@ class Server {
 		~Server();
 		Server(const Server &other);
 		Server &operator=(const Server &other);
+		size_t getClientCount() const;
 		int getPort() const;
 		const std::string getPassword() const;
 		Client* findClientByFd(int fd);
 		void addToChannel(Channel &ch, Client &client);
 };
+
+std::ostream &operator<<(std::ostream &os, const Server &server);
 
 #endif

@@ -23,4 +23,6 @@ class Channel {
         Channel &operator=(const Channel &other);
 };
 
+std::ostream &operator<<(std::ostream &os, const Channel &channel);
+
 #endif
