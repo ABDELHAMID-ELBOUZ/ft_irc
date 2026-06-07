@@ -8,6 +8,45 @@ Client::~Client()
 {
 
 }
+
+Client::Client(const Client &other) : _fd(other._fd), 
+_isRegistered(other._isRegistered), _nickname(other._nickname), 
+_username(other._username), _realname(other._realname) 
+{
+
+}
+
+Client &Client::operator=(const Client &other) 
+{
+	if (this != &other) 
+	{
+		this->_fd = other._fd;
+		this->_isRegistered = other._isRegistered;
+		this->_nickname = other._nickname;
+		this->_username = other._username;
+		this->_realname = other._realname;
+	}
+	return *this;
+}
+
+bool Client::operator==(const Client &other) const 
+{
+	return this->_fd == other._fd;
+}
+
+bool Client::operator!=(const Client &other) const 
+{
+	return !(*this == other);
+}
+
+std::ostream &operator<<(std::ostream &os, const Client &client) 
+{
+	os << "Client FD: " << client.getFd() << ", Registered: " << client.getIsRegistered() 
+	   << ", Nickname: " << client.getNickname() << ", Username: " << client.getUsername() 
+	   << ", Realname: " << client.getRealname();
+	return os;
+}
+
 int Client::getFd() const 
 {
 	return _fd;
@@ -54,40 +93,3 @@ int Client::setRealname(std::string realname)
 	return 0;
 }
 
-Client::Client(const Client &other) : _fd(other._fd), 
-_isRegistered(other._isRegistered), _nickname(other._nickname), 
-_username(other._username), _realname(other._realname) 
-{
-
-}
-
-Client &Client::operator=(const Client &other) 
-{
-	if (this != &other) 
-	{
-		this->_fd = other._fd;
-		this->_isRegistered = other._isRegistered;
-		this->_nickname = other._nickname;
-		this->_username = other._username;
-		this->_realname = other._realname;
-	}
-	return *this;
-}
-
-bool Client::operator==(const Client &other) const 
-{
-	return this->_fd == other._fd;
-}
-
-bool Client::operator!=(const Client &other) const 
-{
-	return !(*this == other);
-}
-
-std::ostream &operator<<(std::ostream &os, const Client &client) 
-{
-	os << "Client FD: " << client.getFd() << ", Registered: " << client.getIsRegistered() 
-	   << ", Nickname: " << client.getNickname() << ", Username: " << client.getUsername() 
-	   << ", Realname: " << client.getRealname();
-	return os;
-}
