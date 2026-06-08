@@ -55,8 +55,6 @@ void Server::addToChannel(Channel &ch, Client &client)
 	ch.addMember(&client);
 }
 
-
-
 std::ostream &operator<<(std::ostream &os, const Server &server) 
 {
 	os << "Server Port: " << server.getPort() << ", Password: " << server.getPassword() << ", Clients: " << server.getClientCount();

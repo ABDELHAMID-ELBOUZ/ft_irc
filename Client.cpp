@@ -92,4 +92,3 @@ int Client::setRealname(std::string realname)
 	this->_realname = realname;
 	return 0;
 }
-

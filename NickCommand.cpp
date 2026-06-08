@@ -9,7 +9,7 @@ NickCommand::~NickCommand()
 {
 
 }
-NickCommand::NickCommand(const NickCommand &other)
+NickCommand::NickCommand(const NickCommand &other) : ACommand(other)
 {
     (void)other;
 }

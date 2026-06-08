@@ -57,4 +57,3 @@ std::ostream &operator<<(std::ostream &os, const Channel &channel)
     os << "Channel Name: " << channel.getName() << ", Topic: " << channel.getTopic() << ", Members: " << channel.getMembers().size();
     return os;
 }
-

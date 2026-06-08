@@ -8,13 +8,14 @@ JoinCommand::~JoinCommand()
 {
 
 }
-JoinCommand::JoinCommand(const JoinCommand &other)
+JoinCommand::JoinCommand(const JoinCommand &other) : ACommand(other) 
 {
     (void)other;
 }
 JoinCommand& JoinCommand::operator=(const JoinCommand &other)
 {
-    (void)other;
+    if (this != &other)
+        ACommand::operator=(other);
     return *this;
 }
 void JoinCommand::execute(Client &client, Server &srv)
