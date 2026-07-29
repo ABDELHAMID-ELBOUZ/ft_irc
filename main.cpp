@@ -1,37 +1,42 @@
-#include <iostream>
-#include "Server.hpp"
-#include "Client.hpp"
-#include "NickCommand.hpp"
-#include "JoinCommand.hpp"
-#include "PassCommand.hpp"
-#include "PrivmsgCommand.hpp"
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.cpp                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kkoujan <kkoujan@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/22 18:32:11 by kkoujan           #+#    #+#             */
+/*   Updated: 2026/06/26 11:06:32 by kkoujan          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-void f()
+#include "./server/Server.hpp"
+
+int main(int ac, char **av)
 {
-    system("leaks ircserver");
-}
-
-int main() {
-    atexit(f);
-    Client client;
-    Server server("password", 6667);
-
-    ACommand* commands[4];
-    commands[0] = new NickCommand();
-    commands[1] = new JoinCommand();
-    commands[2] = new PassCommand();
-    commands[3] = new PrivmsgCommand();
-
-    for (int i = 0; i < 4; i++) {
-        std::cout << commands[i]->name() << ": ";
-        commands[i]->execute(client, server);
+    if (ac != 3)
+	{
+        std::cerr << "Usage: ./ircserv <port> <password>" << std::endl;
+        return 1;
     }
 
-    for (int i = 0; i < 4; i++) {
-        delete commands[i];
-        commands[i] = NULL;
-    }
+    try
+	{
+        int port = atoi(av[1]);
+        if (port < 1024 || port > 65535)
+		{
+            throw std::runtime_error("Invalid port range.");
+        }
+        std::string password = av[2];
 
-    std::cout << "all commands dispatched and cleaned up\n";
+        Server server(port, password);
+        
+        server.start();
+    } 
+    catch (const std::exception &e)
+	{
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
     return 0;
 }

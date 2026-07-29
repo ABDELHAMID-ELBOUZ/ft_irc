@@ -1,16 +1,34 @@
-NAME = ircserver
-C=c++
-FLAGS= -Wall -Wextra -Werror  -g -std=c++98
-SRSC= ACommand.cpp Channel.cpp Client.cpp JoinCommand.cpp NickCommand.cpp Server.cpp main.cpp PassCommand.cpp PrivmsgCommand.cpp UserCommand.cpp
-HEADERS = ACommand.hpp Channel.hpp Client.hpp JoinCommand.hpp NickCommand.hpp Server.hpp PassCommand.hpp PrivmsgCommand.hpp UserCommand.hpp
-OBJS=$(SRSC:.cpp=.o)
-all:$(NAME)
-$(NAME):$(OBJS)
-	$(C) $(FLAGS) $^ -o $(NAME)
-%.o:%.cpp $(HEADERS)
-	$(C) $(FLAGS) -c $< -o $@
-clean:
-	rm -f $(OBJS)
-fclean: clean
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Makefile                                           :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: kkoujan <kkoujan@student.42.fr>            +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2026/06/26 09:10:30 by kkoujan           #+#    #+#              #
+#    Updated: 2026/06/26 11:12:40 by kkoujan          ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
+NAME = ft_irc
+OBJ = ./server/Client.o ./server/Server.o main.o ./command/Parser.o
+HEADERS = ./server/Client.hpp ./server/Server.hpp ./command/Command.hpp ./command/Parser.hpp
+FLAGS = -Wall -Wextra -Werror -std=c++98
+CC = c++
+
+
+all : $(NAME)
+	
+$(NAME) : $(OBJ)
+	$(CC) $(FLAGS) $(OBJ) -o $(NAME)
+
+%.o: %.cpp $(HEADERS)
+	$(CC) $(FLAGS) -c $< -o $@
+
+clean :
+	rm -f $(OBJ)
+
+fclean : clean
 	rm -f $(NAME)
-re: fclean all
+
+re : fclean all
