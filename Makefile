@@ -1,9 +1,10 @@
-NAME = ft_irc
+NAME = ircserv
+
+CC = c++
+FLAGS = -Wall -Wextra -Werror -std=c++98
+
 OBJ = ./server/Client.o ./server/Server.o main.o ./command/Parser.o
 HEADERS = ./server/Client.hpp ./server/Server.hpp ./command/Command.hpp ./command/Parser.hpp
-FLAGS = -Wall -Wextra -Werror -std=c++98
-CC = c++
-
 
 all : $(NAME)
 	
