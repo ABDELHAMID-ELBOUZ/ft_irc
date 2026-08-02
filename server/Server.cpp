@@ -717,3 +717,58 @@ void Server::handleInvite(int fd, const Command& cmd)
 	targetClient->getOutputBuffer() += inviteMsg;
 	notifyPollout(targetClient->getFd());
 }
+
+void Server::handleMode(int fd, const Command& cmd)
+{
+	if (cmd.params.empty()) {
+		sendReply(fd, "461", "MODE :Not enough parameters");
+		return;
+	}
+
+	std::string target = cmd.params[0];
+	if (target[0] != '#' && target[0] != '&') {
+		if (target != _clients[fd].getNickname())
+			sendReply(fd, "401", target + " :No such nick/channel");
+		else
+			sendReply(fd, "501", ":Unknown MODE flag");
+		return;
+	}
+
+	std::map<std::string, Channel>::iterator it = _channels.find(target);
+	if (it == _channels.end()) {
+		sendReply(fd, "403", target + " :No such channel");
+		return;
+	}
+
+	Channel& chan = it->second;
+	if (cmd.params.size() == 1) {
+		std::string modes = "+";
+		if (chan.isInviteOnly()) modes += "i";
+		if (chan.isTopicRestricted()) modes += "t";
+		if (chan.hasKey()) modes += "k";
+		if (chan.getLimit() > 0) modes += "l";
+		sendReply(fd, "324", target + " " + modes);
+		return;
+	}
+
+	if (!chan.isOperator(fd)) {
+		sendReply(fd, "482", target + " :You're not channel operator");
+		return;
+	}
+
+	std::string modestring = cmd.params[1];
+	std::vector<std::string> modeParams;
+	if (cmd.params.size() > 2) 
+		for (size_t i = 2; i < cmd.params.size(); i++)
+			modeParams.push_back(cmd.params[i]);
+
+	bool adding = true;
+	size_t paramIdx = 0;
+	std::string appliedModes = "";
+	std::string appliedParams = "";
+
+	for (size_t i = 0; i < modestring.size(); i++) {
+		char c = modestring[i];
+		if (c)
+	}
+}
