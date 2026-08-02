@@ -235,13 +235,13 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
         
         // === PERSON B HOOKS ===
         if (cmd.cmd == "JOIN")
-            ;
+            handleJoin(fd, cmd);
         else if (cmd.cmd == "PRIVMSG")
             handlePrivmsg(fd, cmd);
         else if (cmd.cmd == "KICK")
-            ; // Person B: handleKick(fd, cmd);
+            handleKick(fd, cmd);
         else if (cmd.cmd == "INVITE")
-            ; // Person B: handleInvite(fd, cmd);
+            handleInvite(fd, cmd);
         else if (cmd.cmd == "TOPIC")
             ; // Person B: handleTopic(fd, cmd);
         else if (cmd.cmd == "MODE")
