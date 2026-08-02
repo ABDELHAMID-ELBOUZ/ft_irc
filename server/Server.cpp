@@ -465,7 +465,7 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 		}
 	} else {
 		Client* recipient = getClientByNick(target);
-		if (!recipient) {
+		if (!recipient || !recipient->isRegistered()) {
 			sendReply(fd, "401", target + " :No such nick/channel");
 			return;
 		}
@@ -473,3 +473,99 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 		notifyPollout(recipient->getFd());
 	}
 }
+
+static std::vector<std::string> splitString(const std::string& str, char delimiter) {
+	std::vector<std::string> tokens;
+	std::string token;
+	for (size_t i = 0; i < str.length(); i++)
+	{
+		if (str[i] == delimiter) {
+			tokens.push_back(token);
+			token.clear();
+		} else {
+			token += str[i];
+		}
+	}
+	if (!token.empty())
+		tokens.push_back(token);
+	return tokens;
+}
+
+void	Server::handleJoin(int fd, const Command& cmd)
+{
+	Client& client = _clients[fd];
+	if (cmd.params.empty()) {
+		sendReply(fd, "461", "JOIN :Not enough parameters");
+		return;
+	}
+
+	std::vector<std::string> channels = splitString(cmd.params[0], ',');
+	std::vector<std::string> keys;
+	if (cmd.params.size() > 1)
+		keys = splitString(cmd.params[1], ',');
+
+	for (size_t i = 0; i < channels.size(); i++) {
+		std::string chanName = channels[i];
+		std::string providedKey = (i < keys.size()) ? keys[i] : "";
+
+		if (chanName.empty() || (chanName[0] != '#' && chanName[0] != '&')) {
+			sendReply(fd, "403", chanName + " :No such channel");
+			continue;
+		}
+
+		std::map<std::string, Channel>::iterator it = _channels.find(chanName);
+		bool isNew = (it == _channels.end());
+		if (isNew) {
+			_channels[chanName] = Channel(chanName);
+			// why? it = _channels.find(chanName);
+		}
+
+		Channel& chan = it->second;
+		if (chan.isClientInChannel(fd)) continue;
+
+		if (chan.isInviteOnly() && !chan.isInvited(fd)) {
+			sendReply(fd, "473", chanName + " :Cannot join channel (+i)");
+			continue;
+		}
+
+		if (chan.hasKey() && providedKey != chan.getKey()) {
+			sendReply(fd, "475", chanName + " :Cannot join channel (+k) - Bad channel key");
+			continue;
+		}
+
+		if (chan.getLimit() > 0 && chan.getClients().size() >= chan.getLimit()) {
+			sendReply(fd, "471", chanName + " :Cannot join channel (+l) - Channel is full");
+			continue;
+		}
+
+		chan.addClient(&client);
+		if (isNew)
+		{
+			chan.addOperator(&client);
+		}
+
+		std::string joinMsg = ":" + client.getNickname() + "!" + client.getUsername()
+							+ "!" + client.getHostname() + " JOIN :" + chanName + "\r\n";
+
+		const std::map<int, Client*>& chanClients = chan.getClients();
+		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++ )  {
+			cit->second->getOutputBuffer() += joinMsg;
+			notifyPollout(cit->first);
+		}
+
+		if (!chan.getTopic().empty())
+			sendReply(fd, "332", chanName + " :" + chan.getTopic());
+		else
+			sendReply(fd, "331", chanName + " :No topic is set");
+
+		std::string names = "";
+		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
+			if (chan.isOperator(cit->first))
+				names += "@";
+			names += cit->second->getNickname() + " ";
+		}
+		sendReply(fd, "353", "= " + chanName + " :" + names);
+		sendReply(fd, "366", chanName + " :End of /NAMES list");
+	}
+}
+
