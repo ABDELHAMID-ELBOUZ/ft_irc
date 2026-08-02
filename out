@@ -1,4 +1,259 @@
-#include "Server.hpp"
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.cpp                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kkoujan <kkoujan@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/22 18:32:11 by kkoujan           #+#    #+#             */
+/*   Updated: 2026/06/26 11:06:32 by kkoujan          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "./server/Server.hpp"
+
+int main(int ac, char **av)
+{
+    if (ac != 3)
+	{
+        std::cerr << "Usage: ./ircserv <port> <password>" << std::endl;
+        return 1;
+    }
+
+    try
+	{
+        int port = atoi(av[1]);
+        if (port < 1024 || port > 65535)
+		{
+            throw std::runtime_error("Invalid port range.");
+        }
+        std::string password = av[2];
+
+        Server server(port, password);
+        
+        server.start();
+    } 
+    catch (const std::exception &e)
+	{
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+    return 0;
+}# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Makefile                                           :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: kkoujan <kkoujan@student.42.fr>            +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2026/06/26 09:10:30 by kkoujan           #+#    #+#              #
+#    Updated: 2026/06/26 11:12:40 by kkoujan          ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
+NAME = ft_irc
+OBJ = ./server/Client.o ./server/Server.o ./command/Channel.o main.o ./command/Parser.o
+HEADERS = ./server/Client.hpp ./server/Server.hpp ./server/Channel.hpp ./command/Command.hpp ./command/Parser.hpp
+FLAGS = -Wall -Wextra -Werror -std=c++98
+CC = c++
+
+
+all : $(NAME)
+	
+$(NAME) : $(OBJ)
+	$(CC) $(FLAGS) $(OBJ) -o $(NAME)
+
+%.o: %.cpp $(HEADERS)
+	$(CC) $(FLAGS) -c $< -o $@
+
+clean :
+	rm -f $(OBJ)
+
+fclean : clean
+	rm -f $(NAME)
+
+re : fclean all
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Client.cpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kkoujan <kkoujan@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/26 09:03:41 by kkoujan           #+#    #+#             */
+/*   Updated: 2026/06/26 09:04:21 by kkoujan          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "Client.hpp"
+
+
+Client::Client() : _fd(-1), _authenticated(false), _registered(false)
+{
+	
+}
+
+Client::Client(int fd) : _fd(fd), _authenticated(false), _registered(false)
+{
+
+}
+
+Client::Client(const Client& other)
+{ 
+	*this = other;
+}
+
+Client& Client::operator=(const Client& other)
+{
+    if (this != &other)
+	{
+        this->_fd = other._fd;
+        this->_input_buffer = other._input_buffer;
+        this->_output_buffer = other._output_buffer;
+        this->_authenticated = other._authenticated;
+        this->_registered = other._registered;
+        this->_nickname = other._nickname;
+        this->_username = other._username;
+        this->_realname = other._realname;
+        this->_hostname = other._hostname;
+    }
+    return *this;
+}
+
+Client::~Client()
+{
+
+}
+
+int Client::getFd() const
+{ 
+	return _fd; 
+}
+std::string& Client::getInputBuffer()
+{ 
+	return _input_buffer;
+}
+std::string& Client::getOutputBuffer()
+{
+	return _output_buffer;
+}
+bool Client::isAuthenticated() const
+{
+    return _authenticated;
+}
+
+bool Client::isRegistered() const
+{
+    return _registered;
+}
+
+const std::string& Client::getNickname() const
+{
+    return _nickname;
+}
+
+const std::string& Client::getUsername() const
+{
+    return _username;
+}
+
+const std::string& Client::getRealname() const
+{
+    return _realname;
+}
+
+const std::string& Client::getHostname() const
+{
+    return _hostname;
+}
+void Client::setAuthenticated(bool val)
+{
+    _authenticated = val;
+}
+
+void Client::setRegistered(bool val)
+{
+    _registered = val;
+}
+
+void Client::setNickname(const std::string& nick)
+{
+    _nickname = nick;
+}
+
+void Client::setUsername(const std::string& user)
+{
+    _username = user;
+}
+
+void Client::setRealname(const std::string& real)
+{
+    _realname = real;
+}
+
+void Client::setHostname(const std::string& host)
+{
+    _hostname = host;
+}
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Client.hpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kkoujan <kkoujan@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/26 08:59:23 by kkoujan           #+#    #+#             */
+/*   Updated: 2026/06/26 09:02:02 by kkoujan          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+
+#ifndef CLIENT_HPP
+#define CLIENT_HPP
+
+#include <map>
+#include <string>
+
+class Client
+{
+    private:
+        int         _fd;
+        std::string _input_buffer; 
+        std::string _output_buffer;
+		bool        _authenticated;
+        bool        _registered;
+        std::string _nickname;
+        std::string _username;
+        std::string _realname;
+        std::string _hostname;
+
+    public:
+        Client();
+        Client(int fd);
+        Client(const Client& other);
+        Client& operator=(const Client& other);
+        ~Client();
+
+        int          getFd() const;
+        std::string& getInputBuffer();
+        std::string& getOutputBuffer();
+		 bool         isAuthenticated() const;
+        bool         isRegistered() const;
+        const std::string& getNickname() const;
+        const std::string& getUsername() const;
+        const std::string& getRealname() const;
+        const std::string& getHostname() const;
+
+        void         setAuthenticated(bool val);
+        void         setRegistered(bool val);
+        void         setNickname(const std::string& nick);
+        void         setUsername(const std::string& user);
+        void         setRealname(const std::string& real);
+        void         setHostname(const std::string& host);
+};
+
+
+#endif#include "Server.hpp"
 
 
 Server::Server() : _port(0), _listen_fd(-1), _server_name("ft.irc")
@@ -243,8 +498,6 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
             handleInvite(fd, cmd);
         else if (cmd.cmd == "TOPIC")
             handleTopic(fd, cmd);
-		else if (cmd.cmd == "PART")
-            handlePart(fd, cmd);
         else if (cmd.cmd == "MODE")
             ; // Person B: handleMode(fd, cmd);
         else
@@ -351,47 +604,12 @@ void Server::removeClient(int fd, size_t index)
 {
     std::cout << "Client on fd " << fd << " disconnected." << std::endl;
     
-    std::string quitMsg;
-    std::map<int, Client>::iterator clientIt = _clients.find(fd);
-    if (clientIt != _clients.end() && clientIt->second.isRegistered())
+    std::map<int, Client>::iterator it = _clients.find(fd);
+    if (it != _clients.end())
     {
-        quitMsg = ":" + clientIt->second.getNickname() + "!" 
-                + clientIt->second.getUsername() + "@"
-                + clientIt->second.getHostname() + " QUIT :Client exited\r\n";
-    }
-    
-    std::map<std::string, Channel>::iterator cit = _channels.begin();
-    while (cit != _channels.end())
-    {
-        if (cit->second.isClientInChannel(fd))
-        {
-            if (!quitMsg.empty())
-            {
-                const std::map<int, Client*>& chanClients = cit->second.getClients();
-                for (std::map<int, Client*>::const_iterator it = chanClients.begin(); it != chanClients.end(); ++it)
-                {
-                    if (it->first != fd)
-                    {
-                        it->second->getOutputBuffer() += quitMsg;
-                        notifyPollout(it->first);
-                    }
-                }
-            }
-            cit->second.removeClient(fd);
-            if (cit->second.getClients().empty())
-            {
-                _channels.erase(cit++);
-                continue;
-            }
-        }
-        ++cit;
-    }
-    
-    if (clientIt != _clients.end())
-    {
-        if (!clientIt->second.getNickname().empty())
-            _nick_to_fd.erase(clientIt->second.getNickname());
-        _clients.erase(clientIt);
+        if (!it->second.getNickname().empty())
+            _nick_to_fd.erase(it->second.getNickname());
+        _clients.erase(it);
     }
     
     close(fd);
@@ -545,7 +763,7 @@ void	Server::handleJoin(int fd, const Command& cmd)
 		std::string providedKey = (i < keys.size()) ? keys[i] : "";
 
 		if (chanName.empty() || (chanName[0] != '#' && chanName[0] != '&')) {
-			    sendReply(fd, "476", chanName + " :Bad Channel Mask");
+			sendReply(fd, "403", chanName + " :No such channel");
 			continue;
 		}
 
@@ -633,12 +851,7 @@ void Server::handleKick(int fd, const Command& cmd)
 	}
 
 	Client* targetClient = getClientByNick(targetNick);
-	if (!targetClient) {
-		sendReply(fd, "401", targetNick + " :No such nick/channel");
-		return;
-	}
-	
-	if (!chan.isClientInChannel(targetClient->getFd())) {
+	if (!targetClient || !chan.isClientInChannel(targetClient->getFd())) {
 		sendReply(fd, "441", targetNick + " " + chanName + " :They aren't on that channel");
 		return;
 	}
@@ -652,11 +865,7 @@ void Server::handleKick(int fd, const Command& cmd)
 		cit->second->getOutputBuffer() += kickMsg;
 		notifyPollout(cit->first);
 	}
-	
-	chan.removeClient(targetClient->getFd());
-	
-	if (chan.getClients().empty())
-		_channels.erase(it);
+	chan.removeOperator(targetClient->getFd());
 }
 
 void Server::handleInvite(int fd, const Command& cmd)
@@ -763,45 +972,293 @@ void Server::handleTopic(int fd, const Command& cmd)
         cit->second->getOutputBuffer() += topicMsg;
         notifyPollout(cit->first);
     }
-}
-void Server::handlePart(int fd, const Command& cmd)
+}#ifndef SERVER_HPP
+#define SERVER_HPP
+
+#include <cstdlib>
+#include <string>
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <iostream>
+#include <unistd.h>    
+#include <poll.h>
+#include <netinet/in.h>
+#include <vector>
+#include <map>
+#include "Client.hpp"
+#include "../command/Command.hpp"
+#include "../command/Parser.hpp"
+#include "../command/Channel.hpp"
+
+#define BUFFER_SIZE 4096
+
+class Server
 {
-	if (cmd.params.empty()) {
-		sendReply(fd, "461", "PART :Not enough parameters");
-		return;
-	}
+    private:
+        std::string                _password;
+        int                        _port;
+        int                        _listen_fd;
+        std::vector<struct pollfd> _fd_list;
+        std::map<int, Client>      _clients;
+        std::map<std::string, int> _nick_to_fd;
+        std::string                _server_name;
+		std::map<std::string, Channel> _channels;
 
-	std::vector<std::string> channels = splitString(cmd.params[0], ',');
-	
-	for (size_t i = 0; i < channels.size(); i++) {
-		std::string chanName = channels[i];
-		
-		std::map<std::string, Channel>::iterator it = _channels.find(chanName);
-		if (it == _channels.end()) {
-			sendReply(fd, "403", chanName + " :No such channel");
-			continue;
-		}
+        void handle_new_connection();
+        bool handle_client_read(size_t index);
+        void handle_client_write(size_t index);
+        void executeCommand(int fd, size_t index, const Command& cmd);
+        void handlePass(int fd, const Command& cmd);
+        void handleNick(int fd, const Command& cmd);
+        void handleUser(int fd, const Command& cmd);
+        void handleQuit(int fd, size_t index, const Command& cmd);
+        void sendReply(int fd, const std::string& code, const std::string& rest);
+        void sendWelcome(int fd);
+        void checkRegistration(int fd);
+        void removeClient(int fd, size_t index);
+        bool isValidNick(const std::string& nick) const;
+        bool isNickInUse(const std::string& nick) const;
 
-		Channel& chan = it->second;
-		if (!chan.isClientInChannel(fd)) {
-			sendReply(fd, "442", chanName + " :You're not on that channel");
-			continue;
-		}
+		void handleJoin(int fd, const Command& cmd);
+		void handlePrivmsg(int fd, const Command& cmd);
+		void handleTopic(int fd, const Command& cmd);
+		void handleInvite(int fd, const Command& cmd);
+		void handleKick(int fd, const Command& cmd);
+		void handleMode(int fd, const Command& cmd);
+		void notifyPollout(int fd);
+		void broadcastToChannel(const std::string& chan, const std::string& msg, int exclude_fd);
+	public:
+		Client* getClientByNick(const std::string& nick);
+        Server();
+        Server(int port, std::string password);       
+        Server(const Server& other);
+        Server& operator=(const Server& other);
+        ~Server();
+        void start();
+};
 
-		Client& client = _clients[fd];
-		std::string partMsg = ":" + client.getNickname() + "!" + client.getUsername()
-							+ "@" + client.getHostname() + " PART " + chanName
-							+ (cmd.trailing.empty() ? "" : " :" + cmd.trailing) + "\r\n";
+#endif#ifndef COMMAND_HPP
+#define COMMAND_HPP
 
-		const std::map<int, Client*>& chanClients = chan.getClients();
-		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
-			cit->second->getOutputBuffer() += partMsg;
-			notifyPollout(cit->first);
-		}
+#include <string>
+#include <vector>
 
-		chan.removeClient(fd);
-		if (chan.getClients().empty()) {
-			_channels.erase(it);
+struct Command
+{
+    std::string              prefix;
+    std::string              cmd;
+    std::vector<std::string> params;
+    std::string              trailing;
+};
+
+#endif#include "Parser.hpp"
+#include <cctype>
+
+Command parseCommand(const std::string& raw)
+{
+    Command result;
+    std::string line = raw;
+    
+    size_t pos = 0;
+    while (pos < line.size() && std::isspace(line[pos]))
+        ++pos;
+    if (pos >= line.size())
+        return result;
+    line = line.substr(pos);
+    
+    pos = line.size();
+    while (pos > 0 && std::isspace(line[pos - 1]))
+        --pos;
+    line = line.substr(0, pos);
+    
+    if (line.empty())
+        return result;
+    
+    if (line[0] == ':')
+    {
+        size_t spacePos = line.find(' ');
+        if (spacePos == std::string::npos)
+        {
+            result.prefix = line.substr(1);
+            return result;
+        }
+        result.prefix = line.substr(1, spacePos - 1);
+        line = line.substr(spacePos + 1);
+        
+        pos = 0;
+        while (pos < line.size() && std::isspace(line[pos]))
+            ++pos;
+        if (pos >= line.size())
+            return result;
+        line = line.substr(pos);
+    }
+    
+    size_t spacePos = line.find(' ');
+    if (spacePos == std::string::npos)
+    {
+        result.cmd = line;
+        for (size_t i = 0; i < result.cmd.size(); ++i)
+            result.cmd[i] = std::toupper(result.cmd[i]);
+        return result;
+    }
+    
+    result.cmd = line.substr(0, spacePos);
+    for (size_t i = 0; i < result.cmd.size(); ++i)
+        result.cmd[i] = std::toupper(result.cmd[i]);
+    
+    line = line.substr(spacePos + 1);
+    
+    while (!line.empty())
+    {
+        pos = 0;
+        while (pos < line.size() && std::isspace(line[pos]))
+            ++pos;
+        if (pos >= line.size())
+            break;
+        line = line.substr(pos);
+        
+        if (line[0] == ':')
+        {
+            result.trailing = line.substr(1);
+            break;
+        }
+        
+        spacePos = line.find(' ');
+        if (spacePos == std::string::npos)
+        {
+            result.params.push_back(line);
+            break;
+        }
+        else
+        {
+            result.params.push_back(line.substr(0, spacePos));
+            line = line.substr(spacePos + 1);
+        }
+    }
+    
+    return result;
+}#ifndef PARSER_HPP
+#define PARSER_HPP
+
+#include "Command.hpp"
+
+Command parseCommand(const std::string& raw);
+
+#endif#include "Channel.hpp"
+#include <algorithm>
+
+Channel::Channel() : limit(0), inviteOnly(false), topicRestricted(true) {}
+
+Channel::Channel(const std::string& name) : name(name), limit(0), inviteOnly(false), topicRestricted(true) {}
+
+Channel::~Channel() {}
+
+const std::string& Channel::getName() const { return name; }
+const std::string& Channel::getTopic() const { return topic; }
+void  Channel::setTopic(const std::string& topic) { this->topic = topic; }
+
+void Channel::addClient(Client* client) { clients[client->getFd()]  = client; }
+void Channel::removeClient(int fd)
+{
+	clients.erase(fd);
+	operators.erase(fd);
+}
+
+void Channel::addOperator(Client* client) { operators[client->getFd()] = client; }
+void Channel::removeOperator(int fd) { operators.erase(fd); }
+
+bool Channel::isClientInChannel(int fd) const { return clients.find(fd) != clients.end(); }
+bool Channel::isOperator(int fd) const { return operators.find(fd) != operators.end(); }
+
+void Channel::broadcast(const std::string& message, int excludeFd) 
+{
+	for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); it++)
+	{
+		if (it->first != excludeFd)
+		{
+			it->second->getOutputBuffer() += message;
 		}
 	}
 }
+
+bool   Channel::isInviteOnly() const { return inviteOnly; }
+void   Channel::setInviteOnly(bool val) { inviteOnly = val; }
+bool   Channel::isTopicRestricted() const { return topicRestricted; }
+void   Channel::setTopicRestricted(bool val) { topicRestricted = val; }
+size_t Channel::getLimit() const { return limit; }
+void   Channel::setLimit(size_t limit) { this->limit = limit; }
+const  std::string& Channel::getKey() const { return key; }
+void   Channel::setKey(const std::string& key) { this->key = key; }
+bool   Channel::hasKey() const { return !key.empty(); }
+
+void Channel::inviteClient(int fd) { inviteFds.push_back(fd); }
+bool Channel::isInvited(int fd) const
+{
+	std::vector<int>::const_iterator it;
+	it = std::find(inviteFds.begin(), inviteFds.end(), fd);
+	return it == inviteFds.end() ? false : true;
+}
+
+const std::map<int, Client*>& Channel::getClients() const { return clients; }
+#ifndef CHANNEL_HPP
+#define CHANNEL_HPP
+
+#include <string>
+#include <map>
+#include <vector>
+#include "../server/Client.hpp"
+
+// PRIVMSG JOIN TOPIC KICK INVITE MODE
+class Channel
+{
+private:
+	std::string	name;
+	std::string topic;
+	std::string key;
+	size_t		limit;
+
+	bool		inviteOnly;
+	bool		topicRestricted;
+
+	std::map<int, Client*> clients;
+	std::map<int, Client*> operators;
+	std::vector<int>		inviteFds;
+
+public:
+	Channel();
+	Channel(const std::string& name);
+	~Channel();
+
+	const std::string& getName() const;
+	const std::string& getTopic() const;
+	void  setTopic(const std::string& topic);
+
+	void addClient(Client* client);
+	void removeClient(int fd);
+	void addOperator(Client* client);
+	void removeOperator(int fd);
+
+	bool isClientInChannel(int fd) const;
+	bool isOperator(int fd) const;
+
+	bool  hasKey() const;
+	const std::string& getKey() const;
+	void  setKey(const std::string& key);
+
+	void setInviteOnly(bool val);
+	bool isInviteOnly() const;
+
+	void setTopicRestricted(bool val);
+	bool isTopicRestricted() const;
+
+	void   setLimit(size_t limit);
+	size_t getLimit() const;
+
+	void inviteClient(int fd);
+	bool isInvited(int fd) const;
+
+	const std::map<int, Client*>& getClients() const;
+	void  broadcast(const std::string& message, int excludeFd = -1);
+};
+
+#endif

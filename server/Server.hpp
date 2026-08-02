@@ -14,6 +14,7 @@
 #include "Client.hpp"
 #include "../command/Command.hpp"
 #include "../command/Parser.hpp"
+#include "../command/Channel.hpp"
 
 #define BUFFER_SIZE 4096
 
@@ -27,7 +28,9 @@ class Server
         std::map<int, Client>      _clients;
         std::map<std::string, int> _nick_to_fd;
         std::string                _server_name;
+		std::map<std::string, Channel> _channels;
 
+		void handlePart(int fd, const Command& cmd);
         void handle_new_connection();
         bool handle_client_read(size_t index);
         void handle_client_write(size_t index);
@@ -42,6 +45,15 @@ class Server
         void removeClient(int fd, size_t index);
         bool isValidNick(const std::string& nick) const;
         bool isNickInUse(const std::string& nick) const;
+
+		void handleJoin(int fd, const Command& cmd);
+		void handlePrivmsg(int fd, const Command& cmd);
+		void handleTopic(int fd, const Command& cmd);
+		void handleInvite(int fd, const Command& cmd);
+		void handleKick(int fd, const Command& cmd);
+		void handleMode(int fd, const Command& cmd);
+		void notifyPollout(int fd);
+		void broadcastToChannel(const std::string& chan, const std::string& msg, int exclude_fd);
 	public:
 		Client* getClientByNick(const std::string& nick);
         Server();

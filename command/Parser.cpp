@@ -7,14 +7,14 @@ Command parseCommand(const std::string& raw)
     std::string line = raw;
     
     size_t pos = 0;
-    while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos])))
+    while (pos < line.size() && std::isspace(line[pos]))
         ++pos;
     if (pos >= line.size())
         return result;
     line = line.substr(pos);
     
     pos = line.size();
-    while (pos > 0 && std::isspace(static_cast<unsigned char>(line[pos - 1])))
+    while (pos > 0 && std::isspace(line[pos - 1]))
         --pos;
     line = line.substr(0, pos);
     
@@ -33,7 +33,7 @@ Command parseCommand(const std::string& raw)
         line = line.substr(spacePos + 1);
         
         pos = 0;
-        while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos])))
+        while (pos < line.size() && std::isspace(line[pos]))
             ++pos;
         if (pos >= line.size())
             return result;
@@ -45,20 +45,20 @@ Command parseCommand(const std::string& raw)
     {
         result.cmd = line;
         for (size_t i = 0; i < result.cmd.size(); ++i)
-            result.cmd[i] = std::toupper(static_cast<unsigned char>(result.cmd[i]));
+            result.cmd[i] = std::toupper(result.cmd[i]);
         return result;
     }
     
     result.cmd = line.substr(0, spacePos);
     for (size_t i = 0; i < result.cmd.size(); ++i)
-        result.cmd[i] = std::toupper(static_cast<unsigned char>(result.cmd[i]));
+        result.cmd[i] = std::toupper(result.cmd[i]);
     
     line = line.substr(spacePos + 1);
     
     while (!line.empty())
     {
         pos = 0;
-        while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos])))
+        while (pos < line.size() && std::isspace(line[pos]))
             ++pos;
         if (pos >= line.size())
             break;

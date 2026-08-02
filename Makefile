@@ -11,8 +11,8 @@
 # **************************************************************************** #
 
 NAME = ft_irc
-OBJ = ./server/Client.o ./server/Server.o main.o ./command/Parser.o
-HEADERS = ./server/Client.hpp ./server/Server.hpp ./command/Command.hpp ./command/Parser.hpp
+OBJ = ./server/Client.o ./server/Server.o ./command/Channel.o main.o ./command/Parser.o
+HEADERS = ./server/Client.hpp ./server/Server.hpp ./server/Channel.hpp ./command/Command.hpp ./command/Parser.hpp
 FLAGS = -Wall -Wextra -Werror -std=c++98
 CC = c++
 
