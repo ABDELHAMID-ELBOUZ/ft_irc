@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
-#include "Client.hpp"
+#include "../server/Client.hpp"
 
 // PRIVMSG JOIN TOPIC KICK INVITE MODE
 class Channel
