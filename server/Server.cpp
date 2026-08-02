@@ -614,3 +614,51 @@ void Server::handleKick(int fd, const Command& cmd)
 	chan.removeOperator(targetClient->getFd());
 }
 
+void Server::handleInvite(int fd, const Command& cmd)
+{
+	if (cmd.params.size() < 2) {
+		sendReply(fd, "461", "INVITE :Not enough parameters");
+		return;
+	}
+
+	std::string targetNick = cmd.params[0];
+	std::string chanName = cmd.params[1];
+
+	Client* targetClient = getClientByNick(targetNick);
+	if (!targetClient) {
+		sendReply(fd, "401", targetNick + " :No such nick/channel");
+		return;
+	}
+
+	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
+	if (it == _channels.end()) {
+		sendReply(fd, "403", chanName + " :No such channel");
+		return;
+	}
+
+	Channel& chan = it->second;
+	if (!chan.isClientInChannel(fd)) {
+		sendReply(fd, "442", chanName + " :You're not on that channel");
+		return;
+	}
+
+	if (chan.isInviteOnly() && !chan.isOperator(fd)) {
+		sendReply(fd, "482", chanName + " :You're not channel operator");
+		return;
+	}
+
+	if (chan.isClientInChannel(targetClient->getFd())) {
+		sendReply(fd, "443", targetNick + " " + chanName + " :is already on channel");
+		return;
+	}
+
+	chan.inviteClient(targetClient->getFd());
+	sendReply(fd, "341", targetNick + " " + chanName);
+
+	std::string inviteMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
+						  + "@" + _clients[fd].getHostname() + " INVITE " + targetNick
+						  + " :" + chanName + "\r\n";
+	targetClient->getOutputBuffer() += inviteMsg;
+	notifyPollout(targetClient->getFd());
+}
+
