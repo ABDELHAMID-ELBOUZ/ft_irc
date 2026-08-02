@@ -243,7 +243,7 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
         else if (cmd.cmd == "INVITE")
             handleInvite(fd, cmd);
         else if (cmd.cmd == "TOPIC")
-            ; // Person B: handleTopic(fd, cmd);
+            handleTopic(fd, cmd);
         else if (cmd.cmd == "MODE")
             ; // Person B: handleMode(fd, cmd);
         else
@@ -569,6 +569,62 @@ void	Server::handleJoin(int fd, const Command& cmd)
 	}
 }
 
+void Server::handleTopic(int fd, const Command& cmd)
+{
+    Client& client = _clients[fd];
+
+    if (cmd.params.empty())
+    {
+        sendReply(fd, "461", "TOPIC :Not enough parameters");
+        return;
+    }
+
+    std::string chanName = cmd.params[0];
+
+    std::map<std::string, Channel>::iterator it = _channels.find(chanName);
+    if (it == _channels.end())
+    {
+        sendReply(fd, "403", chanName + " :No such channel");
+        return;
+    }
+
+    Channel& ch = it->second;
+
+    if (!ch.isClientInChannel(fd))
+    {
+        sendReply(fd, "442", chanName + " :You're not on that channel");
+        return;
+    }
+
+    if (cmd.trailing.empty())
+    {
+        if (ch.getTopic().empty())
+            sendReply(fd, "331", chanName + " :No topic is set");
+        else
+            sendReply(fd, "332", chanName + " :" + ch.getTopic());
+        return;
+    }
+
+    if (ch.isTopicRestricted() && !ch.isOperator(fd))
+    {
+        sendReply(fd, "482", chanName + " :You're not channel operator");
+        return;
+    }
+
+    ch.setTopic(cmd.trailing);
+
+    std::string topicMsg = ":" + client.getNickname() + "!" + client.getUsername()
+                         + "@" + client.getHostname() + " TOPIC " + chanName
+                         + " :" + cmd.trailing + "\r\n";
+
+    const std::map<int, Client*>& clients = ch.getClients();
+    for (std::map<int, Client*>::const_iterator cit = clients.begin(); cit != clients.end(); ++cit)
+    {
+        cit->second->getOutputBuffer() += topicMsg;
+        notifyPollout(cit->first);
+    }
+}
+
 void Server::handleKick(int fd, const Command& cmd)
 {
 	if (cmd.params.size() < 2) {
@@ -661,4 +717,3 @@ void Server::handleInvite(int fd, const Command& cmd)
 	targetClient->getOutputBuffer() += inviteMsg;
 	notifyPollout(targetClient->getFd());
 }
-
