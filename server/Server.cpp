@@ -412,3 +412,64 @@ Client* Server::getClientByNick(const std::string& nick)
         return NULL;
     return &(cit->second);
 }
+
+void Server::notifyPollout(int fd)
+{
+	for (size_t i = 0; i < _fd_list.size(); i++)
+	{
+		if (_fd_list[i].fd == fd)
+		{
+			_fd_list[i].events |= POLLOUT;
+			break;
+		}
+	}
+}
+
+void Server::handlePrivmsg(int fd, const Command& cmd)
+{
+	Client& sender = _clients[fd];
+
+	if (cmd.params.empty()) {
+		sendReply(fd, "411", ":No recipient given (PRIVMSG)");
+		return;
+	}
+	if (cmd.trailing.empty()) {
+		sendReply(fd, "412", ":No text to send");
+		return;
+	}
+
+	std::string target = cmd.params[0];
+	std::string message = ":" + sender.getNickname() + "!" + sender.getUsername()
+						+ "@" + sender.getHostname() + " PRIVMSG " + target
+						+ " :" + cmd.trailing + "\r\n";
+						
+	if (target[0] == '#') {
+		std::map<std::string, Channel>::iterator it = _channels.find(target);
+		if (it == _channels.end()){
+			sendReply(fd, "401", target + " :No such nick/channel");
+			return;
+		}
+
+		Channel& chan = it->second;
+		if (!chan.isClientInChannel(fd)) {
+			sendReply(fd, "404", target + " :Cannot send to channel");
+			return;
+		}
+
+		const std::map<int, Client*>& chanClients = chan.getClients();
+		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
+			if (cit->first != fd) {
+				cit->second->getOutputBuffer() += message;
+				notifyPollout(cit->first);
+			}
+		}
+	} else {
+		Client* recipient = getClientByNick(target);
+		if (!recipient) {
+			sendReply(fd, "401", target + " :No such nick/channel");
+			return;
+		}
+		recipient->getOutputBuffer() += message;
+		notifyPollout(recipient->getFd());
+	}
+}
