@@ -235,7 +235,7 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
         
         // === PERSON B HOOKS ===
         if (cmd.cmd == "JOIN")
-            ; // Person B: handleJoin(fd, cmd);
+            handleJoin(fd, cmd);
         else if (cmd.cmd == "PRIVMSG")
             ; // Person B: handlePrivmsg(fd, cmd);
         else if (cmd.cmd == "KICK")
