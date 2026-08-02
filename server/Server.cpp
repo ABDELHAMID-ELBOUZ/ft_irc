@@ -517,7 +517,7 @@ void	Server::handleJoin(int fd, const Command& cmd)
 		bool isNew = (it == _channels.end());
 		if (isNew) {
 			_channels[chanName] = Channel(chanName);
-			// why? it = _channels.find(chanName);
+			it = _channels.find(chanName);
 		}
 
 		Channel& chan = it->second;
@@ -567,5 +567,50 @@ void	Server::handleJoin(int fd, const Command& cmd)
 		sendReply(fd, "353", "= " + chanName + " :" + names);
 		sendReply(fd, "366", chanName + " :End of /NAMES list");
 	}
+}
+
+void Server::handleKick(int fd, const Command& cmd)
+{
+	if (cmd.params.size() < 2) {
+		sendReply(fd, "461", "KICK :Not enough parameters");
+		return;
+	}
+
+	std::string chanName = cmd.params[0];
+	std::string targetNick = cmd.params[1];
+	std::string reason = cmd.trailing.empty() ? "Kicked by operator" : cmd.trailing;
+
+	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
+	if (it == _channels.end()) {
+		sendReply(fd, "403", chanName + " :No such channel");
+		return;
+	}
+
+	Channel& chan = it->second;
+	if (!chan.isClientInChannel(fd)) {
+		sendReply(fd, "442", chanName + " :You're not on that channel");
+		return;
+	}
+	if (!chan.isOperator(fd)) {
+		sendReply(fd, "482", chanName + " :You're not channel operator");
+		return;
+	}
+
+	Client* targetClient = getClientByNick(targetNick);
+	if (!targetClient || !chan.isClientInChannel(targetClient->getFd())) {
+		sendReply(fd, "441", targetNick + " " + chanName + " :They aren't on that channel");
+		return;
+	}
+
+	std::string kickMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
+						+ "@" + _clients[fd].getHostname() + " KICK " + chanName
+						+ " " + targetNick + " :" + reason + "\r\n";
+	
+	const std::map<int, Client*>& chanClients = chan.getClients();
+	for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
+		cit->second->getOutputBuffer() += kickMsg;
+		notifyPollout(cit->first);
+	}
+	chan.removeOperator(targetClient->getFd());
 }
 
