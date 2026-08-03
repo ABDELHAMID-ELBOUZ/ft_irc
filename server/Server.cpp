@@ -335,7 +335,7 @@ void Server::handleUser(int fd, const Command& cmd)
         sendReply(fd, "462", ":You may not reregister");
         return ;
     }
-    if (cmd.params.empty() || cmd.trailing.empty())
+    if (cmd.params.empty() || cmd.trailing.empty() || cmd.params.size() < 3)
     {
         sendReply(fd, "461", "USER :Not enough parameters");
         return ;
@@ -485,6 +485,7 @@ bool Server::isNickInUse(const std::string& nick) const
 {
     return _nick_to_fd.find(nick) != _nick_to_fd.end();
 }
+
 Client* Server::getClientByNick(const std::string& nick)
 {
     std::map<std::string, int>::iterator it = _nick_to_fd.find(nick);
@@ -870,8 +871,10 @@ void Server::handleMode(int fd, const Command& cmd)
 	{
 		std::string modes = "+";
 		std::string modeParams = "";
-		if (chan.isInviteOnly()) modes += "i";
-		if (chan.isTopicRestricted()) modes += "t";
+		if (chan.isInviteOnly())
+			modes += "i";
+		if (chan.isTopicRestricted())
+			modes += "t";
 		if (chan.hasKey())
 		{
 			modes += "k";

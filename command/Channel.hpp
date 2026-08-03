@@ -6,7 +6,6 @@
 #include <vector>
 #include "../server/Client.hpp"
 
-// PRIVMSG JOIN TOPIC KICK INVITE MODE
 class Channel
 {
 private:
