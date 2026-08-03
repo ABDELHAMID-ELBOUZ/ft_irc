@@ -11,10 +11,12 @@
 #include <netinet/in.h>
 #include <vector>
 #include <map>
+#include <sstream>
 #include "Client.hpp"
 #include "../command/Command.hpp"
 #include "../command/Parser.hpp"
 #include "../command/Channel.hpp"
+
 
 #define BUFFER_SIZE 4096
 

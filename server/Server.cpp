@@ -245,7 +245,7 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
         else if (cmd.cmd == "TOPIC")
             handleTopic(fd, cmd);
         else if (cmd.cmd == "MODE")
-            ; // Person B: handleMode(fd, cmd);
+            handleMode(fd, cmd);
         else
             sendReply(fd, "421", cmd.cmd + " :Unknown command");
     }
@@ -545,7 +545,7 @@ void	Server::handleJoin(int fd, const Command& cmd)
 		}
 
 		std::string joinMsg = ":" + client.getNickname() + "!" + client.getUsername()
-							+ "!" + client.getHostname() + " JOIN :" + chanName + "\r\n";
+							+ "@" + client.getHostname() + " JOIN :" + chanName + "\r\n";
 
 		const std::map<int, Client*>& chanClients = chan.getClients();
 		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++ )  {
@@ -667,7 +667,7 @@ void Server::handleKick(int fd, const Command& cmd)
 		cit->second->getOutputBuffer() += kickMsg;
 		notifyPollout(cit->first);
 	}
-	chan.removeOperator(targetClient->getFd());
+	chan.removeClient(targetClient->getFd());
 }
 
 void Server::handleInvite(int fd, const Command& cmd)
@@ -743,14 +743,23 @@ void Server::handleMode(int fd, const Command& cmd)
 	Channel& chan = it->second;
 	if (cmd.params.size() == 1) {
 		std::string modes = "+";
+		std::string modeParams = "";
 		if (chan.isInviteOnly()) modes += "i";
 		if (chan.isTopicRestricted()) modes += "t";
-		if (chan.hasKey()) modes += "k";
-		if (chan.getLimit() > 0) modes += "l";
-		sendReply(fd, "324", target + " " + modes);
+		if (chan.hasKey()) {
+			modes += "k";
+			modeParams += " " + chan.getKey();
+		}
+		if (chan.getLimit() > 0) {
+			modes += "l";
+			std::ostringstream oss;
+            oss << chan.getLimit();
+            modeParams += " " + oss.str();
+		}
+		sendReply(fd, "324", target + " " + modes + modeParams);
 		return;
 	}
-
+	
 	if (!chan.isOperator(fd)) {
 		sendReply(fd, "482", target + " :You're not channel operator");
 		return;
