@@ -27,9 +27,12 @@ Server& Server::operator=(const Server& other)
         this->_clients = other._clients;
         this->_nick_to_fd = other._nick_to_fd;
         this->_server_name = other._server_name;
+        this->_channels = other._channels;
     }
+
     return *this;
 }
+
 Server::~Server()
 {
     for (size_t i = 0; i < _fd_list.size(); ++i)
@@ -38,12 +41,10 @@ Server::~Server()
 
 void Server::start()
 {
-    // 1. Create IPv4 TCP Stream Socket
     _listen_fd = socket(PF_INET, SOCK_STREAM, 0);
     if (_listen_fd < 0)
         throw std::runtime_error("socket creation failed");
 
-    // 2. Clear port reuse hold time (prevents "Address already in use" errors)
     int sock_opt = 1;
     if (setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(int)) < 0)
 	{
@@ -51,7 +52,6 @@ void Server::start()
         throw std::runtime_error("setsockopt failed");
     }
 
-    // 3. Bind socket to designated port and listen
     struct sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(_port);
@@ -61,18 +61,16 @@ void Server::start()
         close(_listen_fd);
         throw std::runtime_error("bind failed");
     }
-    if (listen(_listen_fd, 128) < 0) // Set standard backlog queue to 128
+
+    if (listen(_listen_fd, 128) < 0)
 	{ 
         close(_listen_fd);
         throw std::runtime_error("listen failed");
     }
 
-    // 4. Force master socket into Non-Blocking mode as strictly demanded [cite: 99, 134]
-    int flags = fcntl(_listen_fd, F_GETFL, 0);
-    if (flags < 0 || fcntl(_listen_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+    if (fcntl(_listen_fd, F_SETFL, O_NONBLOCK)< 0)
         throw std::runtime_error("fcntl non-block setup failed");
 
-    // 5. Register the master socket to monitor incoming connections (POLLIN)
     struct pollfd listen_fd_struct;
     listen_fd_struct.fd = _listen_fd;
     listen_fd_struct.events = POLLIN;
@@ -81,7 +79,6 @@ void Server::start()
 
     std::cout << "IRC Server started on port " << _port << "..." << std::endl;
 
-    // 6. Central Non-Blocking I/O loop
     while (true)
     {
         int p = poll(_fd_list.data(), _fd_list.size(), -1);
@@ -90,7 +87,6 @@ void Server::start()
 
         for (size_t i = 0; i < _fd_list.size(); i++)
         {
-            // Handle Incoming Data / Read Event
             if (_fd_list[i].revents & POLLIN)
             {
                 if (_fd_list[i].fd == _listen_fd)
@@ -99,7 +95,6 @@ void Server::start()
 					i--;
             }
             
-            // Handle Outgoing Data / Write Event (Only triggers if POLLOUT was deliberately enabled)
             if (_fd_list[i].revents & POLLOUT)
                 handle_client_write(i);
         }       
@@ -110,24 +105,20 @@ void Server::handle_new_connection()
 {
     int new_fd = accept(_listen_fd, NULL, NULL);
     if (new_fd < 0)
-        return; // Non-blocking edge case, reject gracefully instead of crashing [cite: 20]
+        return ;
 
-    // Force newly accepted connection into non-blocking mode [cite: 99, 134]
-    int flags = fcntl(new_fd, F_GETFL, 0);
-    if (flags < 0 || fcntl(new_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+    if (fcntl(new_fd, F_SETFL, O_NONBLOCK)< 0)
 	{
         close(new_fd);
-        return;
+        return ;
     }
 
-    // Track file descriptor inside poll tracking list 
     struct pollfd connect_struct;
     connect_struct.fd = new_fd;
-    connect_struct.events = POLLIN; // Monitor read availability initially
+    connect_struct.events = POLLIN;
     connect_struct.revents = 0;
     _fd_list.push_back(connect_struct);
 
-    // Instantiate client data model mapping tracking context to fd
     _clients[new_fd] = Client(new_fd);
     std::cout << "New client connected on fd: " << new_fd << std::endl;
 }
@@ -137,7 +128,7 @@ bool Server::handle_client_read(size_t index)
     char buffer[BUFFER_SIZE];
     int client_fd = _fd_list[index].fd;
     
-    size_t bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    ssize_t bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
     if (bytes <= 0)
     {
         removeClient(client_fd, index);
@@ -146,32 +137,29 @@ bool Server::handle_client_read(size_t index)
 
     buffer[bytes] = '\0';
     Client& client = _clients[client_fd];
-    client.getInputBuffer() += buffer; // Append raw bytes to client buffer 
+    client.getInputBuffer() += buffer;
 
-    // Packet Reconstruction: Extract isolated complete lines ending with \n 
     size_t newline_pos = client.getInputBuffer().find('\n');
     while (newline_pos  != std::string::npos)
     {
         std::string raw_command = client.getInputBuffer().substr(0, newline_pos);
         
-        // Strip trailing carriage returns (\r) typical in IRC protocols
         if (!raw_command.empty() && raw_command[raw_command.size() - 1] == '\r')
             raw_command.erase(raw_command.size() - 1);
 
-        // Process the fully reconstructed command string
         if (!raw_command.empty())
         {
             Command cmd = parseCommand(raw_command);
             executeCommand(client_fd, index, cmd);
             
-            // If QUIT removed the client, stop processing its buffer
             if (_clients.find(client_fd) == _clients.end())
                 return true;
         }
-        // Erase extracted segment from input stream cache
+
         client.getInputBuffer().erase(0, newline_pos + 1);
         newline_pos = client.getInputBuffer().find('\n');
     }
+
 	return false;
 }
 
@@ -183,27 +171,24 @@ void Server::handle_client_write(size_t index)
 
     if (output.empty())
 	{
-        // Stop monitoring writable status if nothing is queued to prevent busy loop overhead [cite: 103]
         _fd_list[index].events &= ~POLLOUT;
-        return;
+        return ;
     }
 
-    // Send whatever fits inside the non-blocking kernel buffer out safely
     int bytes_sent = send(client_fd, output.c_str(), output.size(), 0);
     if (bytes_sent < 0)
-        return; // Try again on next safe loop iteration
+        return ;
 
-    // Remove successfully delivered bytes from memory queue
     output.erase(0, bytes_sent);
 
-    // If completely cleared, disable write notifications until Person 3 queues a new message
     if (output.empty())
         _fd_list[index].events &= ~POLLOUT;
 }
+
 void Server::executeCommand(int fd, size_t index, const Command& cmd)
 {
     if (cmd.cmd.empty())
-        return;
+        return ;
     
     if (cmd.cmd == "PASS")
         handlePass(fd, cmd);
@@ -218,19 +203,13 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
         std::string token = cmd.params.empty() ? "" : cmd.params[0];
         sendReply(fd, "PONG", ":" + token);
     }
-	else if (cmd.cmd == "CAP")
-    {
-        // Ignore capability negotiation —  tell client we support nothing
-        if (!cmd.params.empty() && cmd.params[0] == "LS")
-            sendReply(fd, "CAP", "* LS :");
-    }
-        else
+	else
     {
         Client& c = _clients[fd];
         if (!c.isRegistered())
         {
             sendReply(fd, "451", ":You have not registered");
-            return;
+            return ;
         }
         
         if (cmd.cmd == "JOIN")
@@ -243,10 +222,8 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
             handleInvite(fd, cmd);
         else if (cmd.cmd == "TOPIC")
             handleTopic(fd, cmd);
-		else if (cmd.cmd == "PART")
-            handlePart(fd, cmd);
         else if (cmd.cmd == "MODE")
-            ; // Person B: handleMode(fd, cmd);
+            handleMode(fd, cmd);
         else
             sendReply(fd, "421", cmd.cmd + " :Unknown command");
     }
@@ -255,63 +232,113 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
 void Server::handlePass(int fd, const Command& cmd)
 {
     Client& c = _clients[fd];
+
     if (c.isRegistered())
     {
         sendReply(fd, "462", ":You may not reregister");
-        return;
+        return ;
     }
+
     if (cmd.params.empty())
     {
         sendReply(fd, "461", "PASS :Not enough parameters");
-        return;
+        return ;
     }
+
     if (cmd.params[0] == _password)
+    {
         c.setAuthenticated(true);
+        checkRegistration(fd);
+    }
     else
+	{
+		c.setAuthenticated(false);
         sendReply(fd, "464", ":Password incorrect");
+	}
 }
 
 void Server::handleNick(int fd, const Command& cmd)
 {
     Client& c = _clients[fd];
+
+    if (!c.isAuthenticated())
+    {
+        sendReply(fd, "464", ":Password required before registration");
+        return ;
+    }
+
     if (cmd.params.empty())
     {
         sendReply(fd, "431", ":No nickname given");
-        return;
+        return ;
     }
+
     const std::string& newNick = cmd.params[0];
     if (!isValidNick(newNick))
     {
         sendReply(fd, "432", newNick + " :Erroneous nickname");
-        return;
+        return ;
     }
+
     if (isNickInUse(newNick) && _nick_to_fd[newNick] != fd)
     {
         sendReply(fd, "433", newNick + " :Nickname is already in use");
-        return;
+        return ;
     }
-    
-    if (!c.getNickname().empty())
-        _nick_to_fd.erase(c.getNickname());
-    
+
+    std::string oldNick = c.getNickname();
+    if (c.isRegistered() && !oldNick.empty())
+    {
+        std::string nickMsg = ":" + oldNick + "!" + c.getUsername() + "@" + c.getHostname()
+                            + " NICK :" + newNick + "\r\n";
+
+        c.getOutputBuffer() += nickMsg;
+        notifyPollout(fd);
+
+        for (std::map<std::string, Channel>::iterator it = _channels.begin(); it != _channels.end(); ++it)
+        {
+            if (it->second.isClientInChannel(fd))
+            {
+                const std::map<int, Client*>& clients = it->second.getClients();
+                for (std::map<int, Client*>::const_iterator cit = clients.begin(); cit != clients.end(); ++cit)
+                {
+                    if (cit->first != fd)
+                    {
+                        cit->second->getOutputBuffer() += nickMsg;
+                        notifyPollout(cit->first);
+                    }
+                }
+            }
+        }
+    }
+
+    if (!oldNick.empty())
+        _nick_to_fd.erase(oldNick);
+
     c.setNickname(newNick);
     _nick_to_fd[newNick] = fd;
-    
+
     checkRegistration(fd);
 }
 
 void Server::handleUser(int fd, const Command& cmd)
 {
     Client& c = _clients[fd];
+
+    if (!c.isAuthenticated())
+    {
+        sendReply(fd, "464", ":Password required before registration");
+        return ;
+    }
     if (c.isRegistered())
     {
         sendReply(fd, "462", ":You may not reregister");
-        return;
+        return ;
     }
     if (cmd.params.empty() || cmd.trailing.empty())
     {
         sendReply(fd, "461", "USER :Not enough parameters");
-        return;
+        return ;
     }
     c.setUsername(cmd.params[0]);
     c.setRealname(cmd.trailing);
@@ -321,8 +348,10 @@ void Server::handleUser(int fd, const Command& cmd)
 void Server::checkRegistration(int fd)
 {
     Client& c = _clients[fd];
-    if (!c.isRegistered() && c.isAuthenticated()
-        && !c.getNickname().empty() && !c.getUsername().empty())
+    if (c.isRegistered())
+        return ;
+
+    if (!c.getNickname().empty() && !c.getUsername().empty() && c.isAuthenticated())
     {
         c.setRegistered(true);
         c.setHostname("localhost");
@@ -343,7 +372,30 @@ void Server::sendWelcome(int fd)
 
 void Server::handleQuit(int fd, size_t index, const Command& cmd)
 {
-    (void)cmd;
+    std::map<int, Client>::iterator it = _clients.find(fd);
+    if (it != _clients.end())
+    {
+        Client& c = it->second;
+        std::string reason = cmd.trailing.empty() ? "Client Quit" : cmd.trailing;
+        std::string quitMsg = ":" + c.getNickname() + "!" + c.getUsername()
+                            + "@" + c.getHostname() + " QUIT :" + reason + "\r\n";
+        
+        for (std::map<std::string, Channel>::iterator cit = _channels.begin(); cit != _channels.end(); ++cit)
+        {
+            if (cit->second.isClientInChannel(fd))
+            {
+                const std::map<int, Client*>& clients = cit->second.getClients();
+                for (std::map<int, Client*>::const_iterator it2 = clients.begin(); it2 != clients.end(); ++it2)
+                {
+                    if (it2->first != fd)
+                    {
+                        it2->second->getOutputBuffer() += quitMsg;
+                        notifyPollout(it2->first);
+                    }
+                }
+            }
+        }
+    }
     removeClient(fd, index);
 }
 
@@ -351,47 +403,26 @@ void Server::removeClient(int fd, size_t index)
 {
     std::cout << "Client on fd " << fd << " disconnected." << std::endl;
     
-    std::string quitMsg;
-    std::map<int, Client>::iterator clientIt = _clients.find(fd);
-    if (clientIt != _clients.end() && clientIt->second.isRegistered())
+    std::map<int, Client>::iterator it = _clients.find(fd);
+    if (it != _clients.end())
     {
-        quitMsg = ":" + clientIt->second.getNickname() + "!" 
-                + clientIt->second.getUsername() + "@"
-                + clientIt->second.getHostname() + " QUIT :Client exited\r\n";
-    }
-    
-    std::map<std::string, Channel>::iterator cit = _channels.begin();
-    while (cit != _channels.end())
-    {
-        if (cit->second.isClientInChannel(fd))
+        for (std::map<std::string, Channel>::iterator cit = _channels.begin(); cit != _channels.end(); )
         {
-            if (!quitMsg.empty())
+            if (cit->second.isClientInChannel(fd))
             {
-                const std::map<int, Client*>& chanClients = cit->second.getClients();
-                for (std::map<int, Client*>::const_iterator it = chanClients.begin(); it != chanClients.end(); ++it)
+                cit->second.removeClient(fd);
+                if (cit->second.getClients().empty())
                 {
-                    if (it->first != fd)
-                    {
-                        it->second->getOutputBuffer() += quitMsg;
-                        notifyPollout(it->first);
-                    }
+                    _channels.erase(cit++);
+                    continue ;
                 }
             }
-            cit->second.removeClient(fd);
-            if (cit->second.getClients().empty())
-            {
-                _channels.erase(cit++);
-                continue;
-            }
+            ++cit;
         }
-        ++cit;
-    }
-    
-    if (clientIt != _clients.end())
-    {
-        if (!clientIt->second.getNickname().empty())
-            _nick_to_fd.erase(clientIt->second.getNickname());
-        _clients.erase(clientIt);
+        
+        if (!it->second.getNickname().empty())
+            _nick_to_fd.erase(it->second.getNickname());
+        _clients.erase(it);
     }
     
     close(fd);
@@ -403,7 +434,7 @@ void Server::sendReply(int fd, const std::string& code, const std::string& rest)
 {
     std::map<int, Client>::iterator it = _clients.find(fd);
     if (it == _clients.end())
-        return;
+        return ;
     
     std::string nick = it->second.getNickname();
     if (nick.empty())
@@ -423,14 +454,30 @@ void Server::sendReply(int fd, const std::string& code, const std::string& rest)
 
 bool Server::isValidNick(const std::string& nick) const
 {
-    if (nick.empty())
+    if (nick.empty() || nick.size() > 9)
         return false;
-    for (size_t i = 0; i < nick.size(); ++i)
+
+    char first = nick[0];
+    bool firstOk = std::isalpha(first)
+                || first == '[' || first == ']' || first == '\\'
+                || first == '`' || first == '_' || first == '^'
+                || first == '{' || first == '|' || first == '}';
+
+    if (!firstOk)
+        return false;
+
+    for (size_t i = 1; i < nick.size(); ++i)
     {
         char c = nick[i];
-        if (c == ' ' || c == ':' || c == ',' || c == '*' || c == '?' || c == '!' || c == '@' || c == '.')
+        bool ok = std::isalnum(c)
+               || c == '[' || c == ']' || c == '\\'
+               || c == '`' || c == '_' || c == '^'
+               || c == '{' || c == '|' || c == '}' || c == '-';
+
+        if (!ok)
             return false;
     }
+
     return true;
 }
 
@@ -443,6 +490,7 @@ Client* Server::getClientByNick(const std::string& nick)
     std::map<std::string, int>::iterator it = _nick_to_fd.find(nick);
     if (it == _nick_to_fd.end())
         return NULL;
+
     std::map<int, Client>::iterator cit = _clients.find(it->second);
     if (cit == _clients.end())
         return NULL;
@@ -465,13 +513,16 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 {
 	Client& sender = _clients[fd];
 
-	if (cmd.params.empty()) {
+	if (cmd.params.empty())
+	{
 		sendReply(fd, "411", ":No recipient given (PRIVMSG)");
-		return;
+		return ;
 	}
-	if (cmd.trailing.empty()) {
+
+	if (cmd.trailing.empty())
+	{
 		sendReply(fd, "412", ":No text to send");
-		return;
+		return ;
 	}
 
 	std::string target = cmd.params[0];
@@ -479,48 +530,59 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 						+ "@" + sender.getHostname() + " PRIVMSG " + target
 						+ " :" + cmd.trailing + "\r\n";
 						
-	if (target[0] == '#') {
+	if (target[0] == '#' || target[0] == '&')
+	{
 		std::map<std::string, Channel>::iterator it = _channels.find(target);
-		if (it == _channels.end()){
+		if (it == _channels.end())
+		{
 			sendReply(fd, "401", target + " :No such nick/channel");
-			return;
+			return ;
 		}
 
 		Channel& chan = it->second;
-		if (!chan.isClientInChannel(fd)) {
+		if (!chan.isClientInChannel(fd))
+		{
 			sendReply(fd, "404", target + " :Cannot send to channel");
-			return;
+			return ;
 		}
 
 		const std::map<int, Client*>& chanClients = chan.getClients();
-		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
-			if (cit->first != fd) {
+		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
+		{
+			if (cit->first != fd)
+			{
 				cit->second->getOutputBuffer() += message;
 				notifyPollout(cit->first);
 			}
 		}
-	} else {
+	}
+	else
+	{
 		Client* recipient = getClientByNick(target);
-		if (!recipient || !recipient->isRegistered()) {
+		if (!recipient || !recipient->isRegistered())
+		{
 			sendReply(fd, "401", target + " :No such nick/channel");
-			return;
+			return ;
 		}
+
 		recipient->getOutputBuffer() += message;
 		notifyPollout(recipient->getFd());
 	}
 }
 
-static std::vector<std::string> splitString(const std::string& str, char delimiter) {
+static std::vector<std::string> splitString(const std::string& str, char delimiter)
+{
 	std::vector<std::string> tokens;
 	std::string token;
 	for (size_t i = 0; i < str.length(); i++)
 	{
-		if (str[i] == delimiter) {
+		if (str[i] == delimiter)
+		{
 			tokens.push_back(token);
 			token.clear();
-		} else {
-			token += str[i];
 		}
+		else
+			token += str[i];
 	}
 	if (!token.empty())
 		tokens.push_back(token);
@@ -530,9 +592,10 @@ static std::vector<std::string> splitString(const std::string& str, char delimit
 void	Server::handleJoin(int fd, const Command& cmd)
 {
 	Client& client = _clients[fd];
-	if (cmd.params.empty()) {
+	if (cmd.params.empty())
+	{
 		sendReply(fd, "461", "JOIN :Not enough parameters");
-		return;
+		return ;
 	}
 
 	std::vector<std::string> channels = splitString(cmd.params[0], ',');
@@ -540,51 +603,56 @@ void	Server::handleJoin(int fd, const Command& cmd)
 	if (cmd.params.size() > 1)
 		keys = splitString(cmd.params[1], ',');
 
-	for (size_t i = 0; i < channels.size(); i++) {
+	for (size_t i = 0; i < channels.size(); i++)
+	{
 		std::string chanName = channels[i];
 		std::string providedKey = (i < keys.size()) ? keys[i] : "";
 
-		if (chanName.empty() || (chanName[0] != '#' && chanName[0] != '&')) {
-			    sendReply(fd, "476", chanName + " :Bad Channel Mask");
-			continue;
+		if (chanName.empty() || (chanName[0] != '#' && chanName[0] != '&'))
+		{
+			sendReply(fd, "403", chanName + " :No such channel");
+			continue ;
 		}
 
 		std::map<std::string, Channel>::iterator it = _channels.find(chanName);
 		bool isNew = (it == _channels.end());
-		if (isNew) {
+		if (isNew)
+		{
 			_channels[chanName] = Channel(chanName);
 			it = _channels.find(chanName);
 		}
 
 		Channel& chan = it->second;
-		if (chan.isClientInChannel(fd)) continue;
+		if (chan.isClientInChannel(fd))
+			continue ;
 
-		if (chan.isInviteOnly() && !chan.isInvited(fd)) {
+		if (chan.isInviteOnly() && !chan.isInvited(fd))
+		{
 			sendReply(fd, "473", chanName + " :Cannot join channel (+i)");
-			continue;
+			continue ;
 		}
 
 		if (chan.hasKey() && providedKey != chan.getKey()) {
 			sendReply(fd, "475", chanName + " :Cannot join channel (+k) - Bad channel key");
-			continue;
+			continue ;
 		}
 
 		if (chan.getLimit() > 0 && chan.getClients().size() >= chan.getLimit()) {
 			sendReply(fd, "471", chanName + " :Cannot join channel (+l) - Channel is full");
-			continue;
+			continue ;
 		}
 
 		chan.addClient(&client);
+		chan.removeInvite(fd);
 		if (isNew)
-		{
 			chan.addOperator(&client);
-		}
 
 		std::string joinMsg = ":" + client.getNickname() + "!" + client.getUsername()
-                    + "@" + client.getHostname() + " JOIN " + chanName + "\r\n";
+							+ "@" + client.getHostname() + " JOIN :" + chanName + "\r\n";
 
 		const std::map<int, Client*>& chanClients = chan.getClients();
-		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++ )  {
+		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++ ) 
+		{
 			cit->second->getOutputBuffer() += joinMsg;
 			notifyPollout(cit->first);
 		}
@@ -595,117 +663,18 @@ void	Server::handleJoin(int fd, const Command& cmd)
 			sendReply(fd, "331", chanName + " :No topic is set");
 
 		std::string names = "";
-		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
+		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
+		{
 			if (chan.isOperator(cit->first))
 				names += "@";
 			names += cit->second->getNickname() + " ";
 		}
+
 		sendReply(fd, "353", "= " + chanName + " :" + names);
 		sendReply(fd, "366", chanName + " :End of /NAMES list");
 	}
 }
 
-void Server::handleKick(int fd, const Command& cmd)
-{
-	if (cmd.params.size() < 2) {
-		sendReply(fd, "461", "KICK :Not enough parameters");
-		return;
-	}
-
-	std::string chanName = cmd.params[0];
-	std::string targetNick = cmd.params[1];
-	std::string reason = cmd.trailing.empty() ? "Kicked by operator" : cmd.trailing;
-
-	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
-	if (it == _channels.end()) {
-		sendReply(fd, "403", chanName + " :No such channel");
-		return;
-	}
-
-	Channel& chan = it->second;
-	if (!chan.isClientInChannel(fd)) {
-		sendReply(fd, "442", chanName + " :You're not on that channel");
-		return;
-	}
-	if (!chan.isOperator(fd)) {
-		sendReply(fd, "482", chanName + " :You're not channel operator");
-		return;
-	}
-
-	Client* targetClient = getClientByNick(targetNick);
-	if (!targetClient) {
-		sendReply(fd, "401", targetNick + " :No such nick/channel");
-		return;
-	}
-	
-	if (!chan.isClientInChannel(targetClient->getFd())) {
-		sendReply(fd, "441", targetNick + " " + chanName + " :They aren't on that channel");
-		return;
-	}
-
-	std::string kickMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
-						+ "@" + _clients[fd].getHostname() + " KICK " + chanName
-						+ " " + targetNick + " :" + reason + "\r\n";
-	
-	const std::map<int, Client*>& chanClients = chan.getClients();
-	for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
-		cit->second->getOutputBuffer() += kickMsg;
-		notifyPollout(cit->first);
-	}
-	
-	chan.removeClient(targetClient->getFd());
-	
-	if (chan.getClients().empty())
-		_channels.erase(it);
-}
-
-void Server::handleInvite(int fd, const Command& cmd)
-{
-	if (cmd.params.size() < 2) {
-		sendReply(fd, "461", "INVITE :Not enough parameters");
-		return;
-	}
-
-	std::string targetNick = cmd.params[0];
-	std::string chanName = cmd.params[1];
-
-	Client* targetClient = getClientByNick(targetNick);
-	if (!targetClient) {
-		sendReply(fd, "401", targetNick + " :No such nick/channel");
-		return;
-	}
-
-	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
-	if (it == _channels.end()) {
-		sendReply(fd, "403", chanName + " :No such channel");
-		return;
-	}
-
-	Channel& chan = it->second;
-	if (!chan.isClientInChannel(fd)) {
-		sendReply(fd, "442", chanName + " :You're not on that channel");
-		return;
-	}
-
-	if (chan.isInviteOnly() && !chan.isOperator(fd)) {
-		sendReply(fd, "482", chanName + " :You're not channel operator");
-		return;
-	}
-
-	if (chan.isClientInChannel(targetClient->getFd())) {
-		sendReply(fd, "443", targetNick + " " + chanName + " :is already on channel");
-		return;
-	}
-
-	chan.inviteClient(targetClient->getFd());
-	sendReply(fd, "341", targetNick + " " + chanName);
-
-	std::string inviteMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
-						  + "@" + _clients[fd].getHostname() + " INVITE " + targetNick
-						  + " :" + chanName + "\r\n";
-	targetClient->getOutputBuffer() += inviteMsg;
-	notifyPollout(targetClient->getFd());
-}
 void Server::handleTopic(int fd, const Command& cmd)
 {
     Client& client = _clients[fd];
@@ -713,7 +682,7 @@ void Server::handleTopic(int fd, const Command& cmd)
     if (cmd.params.empty())
     {
         sendReply(fd, "461", "TOPIC :Not enough parameters");
-        return;
+        return ;
     }
 
     std::string chanName = cmd.params[0];
@@ -722,7 +691,7 @@ void Server::handleTopic(int fd, const Command& cmd)
     if (it == _channels.end())
     {
         sendReply(fd, "403", chanName + " :No such channel");
-        return;
+        return ;
     }
 
     Channel& ch = it->second;
@@ -730,29 +699,26 @@ void Server::handleTopic(int fd, const Command& cmd)
     if (!ch.isClientInChannel(fd))
     {
         sendReply(fd, "442", chanName + " :You're not on that channel");
-        return;
+        return ;
     }
 
-    // No trailing parameter = view topic only
     if (cmd.trailing.empty())
     {
         if (ch.getTopic().empty())
             sendReply(fd, "331", chanName + " :No topic is set");
         else
             sendReply(fd, "332", chanName + " :" + ch.getTopic());
-        return;
+        return ;
     }
 
-    // Set topic — check restriction
     if (ch.isTopicRestricted() && !ch.isOperator(fd))
     {
         sendReply(fd, "482", chanName + " :You're not channel operator");
-        return;
+        return ;
     }
 
     ch.setTopic(cmd.trailing);
 
-    // Broadcast topic change to all channel members
     std::string topicMsg = ":" + client.getNickname() + "!" + client.getUsername()
                          + "@" + client.getHostname() + " TOPIC " + chanName
                          + " :" + cmd.trailing + "\r\n";
@@ -764,44 +730,282 @@ void Server::handleTopic(int fd, const Command& cmd)
         notifyPollout(cit->first);
     }
 }
-void Server::handlePart(int fd, const Command& cmd)
+
+void Server::handleKick(int fd, const Command& cmd)
 {
-	if (cmd.params.empty()) {
-		sendReply(fd, "461", "PART :Not enough parameters");
-		return;
+	if (cmd.params.size() < 2)
+	{
+		sendReply(fd, "461", "KICK :Not enough parameters");
+		return ;
 	}
 
-	std::vector<std::string> channels = splitString(cmd.params[0], ',');
+	std::string chanName = cmd.params[0];
+	std::string targetNick = cmd.params[1];
+	std::string reason = cmd.trailing.empty() ? "Kicked by operator" : cmd.trailing;
+
+	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
+	if (it == _channels.end())
+	{
+		sendReply(fd, "403", chanName + " :No such channel");
+		return ;
+	}
+
+	Channel& chan = it->second;
+	if (!chan.isClientInChannel(fd))
+	{
+		sendReply(fd, "442", chanName + " :You're not on that channel");
+		return ;
+	}
+	if (!chan.isOperator(fd))
+	{
+		sendReply(fd, "482", chanName + " :You're not channel operator");
+		return ;
+	}
+
+	Client* targetClient = getClientByNick(targetNick);
+	if (!targetClient || !chan.isClientInChannel(targetClient->getFd()))
+	{
+		sendReply(fd, "441", targetNick + " " + chanName + " :They aren't on that channel");
+		return ;
+	}
+
+	std::string kickMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
+						+ "@" + _clients[fd].getHostname() + " KICK " + chanName
+						+ " " + targetNick + " :" + reason + "\r\n";
 	
-	for (size_t i = 0; i < channels.size(); i++) {
-		std::string chanName = channels[i];
-		
-		std::map<std::string, Channel>::iterator it = _channels.find(chanName);
-		if (it == _channels.end()) {
-			sendReply(fd, "403", chanName + " :No such channel");
-			continue;
+	const std::map<int, Client*>& chanClients = chan.getClients();
+	for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
+	{
+		cit->second->getOutputBuffer() += kickMsg;
+		notifyPollout(cit->first);
+	}
+
+	chan.removeClient(targetClient->getFd());
+    if (chan.getClients().empty())
+        _channels.erase(it);
+}
+
+void Server::handleInvite(int fd, const Command& cmd)
+{
+	if (cmd.params.size() < 2)
+	{
+		sendReply(fd, "461", "INVITE :Not enough parameters");
+		return ;
+	}
+
+	std::string targetNick = cmd.params[0];
+	std::string chanName = cmd.params[1];
+
+	Client* targetClient = getClientByNick(targetNick);
+	if (!targetClient)
+	{
+		sendReply(fd, "401", targetNick + " :No such nick/channel");
+		return ;
+	}
+
+	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
+	if (it == _channels.end())
+	{
+		sendReply(fd, "403", chanName + " :No such channel");
+		return ;
+	}
+
+	Channel& chan = it->second;
+	if (!chan.isClientInChannel(fd))
+	{
+		sendReply(fd, "442", chanName + " :You're not on that channel");
+		return ;
+	}
+
+	if (chan.isInviteOnly() && !chan.isOperator(fd))
+	{
+		sendReply(fd, "482", chanName + " :You're not channel operator");
+		return ;
+	}
+
+	if (chan.isClientInChannel(targetClient->getFd()))
+	{
+		sendReply(fd, "443", targetNick + " " + chanName + " :is already on channel");
+		return ;
+	}
+
+	chan.inviteClient(targetClient->getFd());
+	sendReply(fd, "341", targetNick + " " + chanName);
+
+	std::string inviteMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
+						  + "@" + _clients[fd].getHostname() + " INVITE " + targetNick
+						  + " :" + chanName + "\r\n";
+
+	targetClient->getOutputBuffer() += inviteMsg;
+	notifyPollout(targetClient->getFd());
+}
+
+void Server::handleMode(int fd, const Command& cmd)
+{
+	if (cmd.params.empty())
+	{
+		sendReply(fd, "461", "MODE :Not enough parameters");
+		return ;
+	}
+
+	std::string target = cmd.params[0];
+	if (target[0] != '#' && target[0] != '&')
+	{
+		if (target != _clients[fd].getNickname())
+			sendReply(fd, "401", target + " :No such nick/channel");
+		else
+			sendReply(fd, "501", ":Unknown MODE flag");
+		return ;
+	}
+
+	std::map<std::string, Channel>::iterator it = _channels.find(target);
+	if (it == _channels.end())
+	{
+		sendReply(fd, "403", target + " :No such channel");
+		return ;
+	}
+
+	Channel& chan = it->second;
+	if (cmd.params.size() == 1)
+	{
+		std::string modes = "+";
+		std::string modeParams = "";
+		if (chan.isInviteOnly()) modes += "i";
+		if (chan.isTopicRestricted()) modes += "t";
+		if (chan.hasKey())
+		{
+			modes += "k";
+			modeParams += " " + chan.getKey();
+		}
+		if (chan.getLimit() > 0)
+		{
+			modes += "l";
+			std::ostringstream oss;
+            oss << chan.getLimit();
+            modeParams += " " + oss.str();
 		}
 
-		Channel& chan = it->second;
-		if (!chan.isClientInChannel(fd)) {
-			sendReply(fd, "442", chanName + " :You're not on that channel");
-			continue;
+		sendReply(fd, "324", target + " " + modes + modeParams);
+		return ;
+	}
+	
+	if (!chan.isOperator(fd))
+	{
+		sendReply(fd, "482", target + " :You're not channel operator");
+		return ;
+	}
+
+	std::string modestring = cmd.params[1];
+	std::vector<std::string> modeParams;
+	if (cmd.params.size() > 2)
+	{
+		for (size_t i = 2; i < cmd.params.size(); i++)
+			modeParams.push_back(cmd.params[i]);
+	}
+
+	bool adding = true;
+	size_t paramIdx = 0;
+	std::string appliedModes = "";
+	std::string appliedParams = "";
+
+	for (size_t i = 0; i < modestring.size(); i++)
+	{
+		char c = modestring[i];
+		if (c == '+')
+		{ 
+			adding = true;
+			appliedModes += "+";
+			continue ;
 		}
+		if (c == '-')
+		{ 
+			adding = false;
+			appliedModes += '-';
+			continue ;
+		}
+		if (c == 'i')
+		{
+			chan.setInviteOnly(adding);
+			appliedModes += "i";
+		} 
+		else if (c == 't')
+		{
+			chan.setTopicRestricted(adding);
+			appliedModes += "t";
+		} 
+		else if (c == 'k')
+		{
+			if (adding && paramIdx < modeParams.size())
+			{
+				chan.setKey(modeParams[paramIdx]);
+				appliedModes += "k";
+				appliedParams += " " + modeParams[paramIdx]; 
+				paramIdx++;
+			}
+			else if (!adding)
+			{
+				chan.setKey("");
+				appliedModes += "k";
+			}
+		}
+		else if (c == 'l')
+		{
+			if (adding && paramIdx < modeParams.size())
+			{
+				int limit = std::atoi(modeParams[paramIdx].c_str());
+				if (limit > 0)
+				{
+					chan.setLimit(static_cast<size_t>(limit));
+					appliedModes += "l";
+					appliedParams += " " + modeParams[paramIdx];
+				}
+				paramIdx++;
+			}
+			else if (!adding)
+			{
+				chan.setLimit(0);
+				appliedModes += "l";
+			}
+		}
+		else if (c == 'o')
+		{
+			if (paramIdx < modeParams.size())
+			{
+				Client* targetClient = getClientByNick(modeParams[paramIdx]);
+				if (!targetClient || !chan.isClientInChannel(targetClient->getFd())) 
+					sendReply(fd, "441", modeParams[paramIdx] + " " + target + " :They aren't on that channel");
+				else 
+				{
+					if (adding)
+						chan.addOperator(targetClient);
+					else
+						chan.removeOperator(targetClient->getFd());
+					appliedModes += 'o';
+					appliedParams += " " + modeParams[paramIdx];
+				}
+				paramIdx++;
+			}
+			else
+				sendReply(fd, "461", "MODE :Not enough parameters");
+		}
+		else
+		{
+			std::string err; err += c;
+			sendReply(fd, "472", err + " :is unknown mode char to me");
+		}
+	}
 
-		Client& client = _clients[fd];
-		std::string partMsg = ":" + client.getNickname() + "!" + client.getUsername()
-							+ "@" + client.getHostname() + " PART " + chanName
-							+ (cmd.trailing.empty() ? "" : " :" + cmd.trailing) + "\r\n";
+	if (appliedModes.size() > 1 || (appliedModes.size() == 1 && appliedModes[0] != '+' && appliedModes[0] != '-'))
+	{
+		std::string notify = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
+						   + "@" + _clients[fd].getHostname() + " MODE " + target + " " 
+						   + appliedModes + appliedParams + "\r\n";
 
-		const std::map<int, Client*>& chanClients = chan.getClients();
-		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++) {
-			cit->second->getOutputBuffer() += partMsg;
+		const std::map<int, Client*>& clients = chan.getClients();
+		for (std::map<int, Client*>::const_iterator cit = clients.begin(); cit != clients.end(); cit++)
+		{
+			cit->second->getOutputBuffer() += notify;
 			notifyPollout(cit->first);
-		}
-
-		chan.removeClient(fd);
-		if (chan.getClients().empty()) {
-			_channels.erase(it);
 		}
 	}
 }

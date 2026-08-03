@@ -30,7 +30,7 @@ public:
 	const std::string& getName() const;
 	const std::string& getTopic() const;
 	void  setTopic(const std::string& topic);
-
+	void removeInvite(int fd);
 	void addClient(Client* client);
 	void removeClient(int fd);
 	void addOperator(Client* client);

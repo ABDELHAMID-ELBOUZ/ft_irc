@@ -11,10 +11,12 @@
 #include <netinet/in.h>
 #include <vector>
 #include <map>
+#include <sstream>
 #include "Client.hpp"
 #include "../command/Command.hpp"
 #include "../command/Parser.hpp"
 #include "../command/Channel.hpp"
+
 
 #define BUFFER_SIZE 4096
 
@@ -30,7 +32,6 @@ class Server
         std::string                _server_name;
 		std::map<std::string, Channel> _channels;
 
-		void handlePart(int fd, const Command& cmd);
         void handle_new_connection();
         bool handle_client_read(size_t index);
         void handle_client_write(size_t index);
@@ -53,7 +54,6 @@ class Server
 		void handleKick(int fd, const Command& cmd);
 		void handleMode(int fd, const Command& cmd);
 		void notifyPollout(int fd);
-		void broadcastToChannel(const std::string& chan, const std::string& msg, int exclude_fd);
 	public:
 		Client* getClientByNick(const std::string& nick);
         Server();

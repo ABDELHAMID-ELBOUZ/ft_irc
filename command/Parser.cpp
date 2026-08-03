@@ -60,6 +60,7 @@ Command parseCommand(const std::string& raw)
         pos = 0;
         while (pos < line.size() && std::isspace(line[pos]))
             ++pos;
+
         if (pos >= line.size())
             break;
         line = line.substr(pos);
