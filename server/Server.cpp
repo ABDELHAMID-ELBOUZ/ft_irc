@@ -669,7 +669,6 @@ void	Server::handleJoin(int fd, const Command& cmd)
 				names += "@";
 			names += cit->second->getNickname() + " ";
 		}
-
 		sendReply(fd, "353", "= " + chanName + " :" + names);
 		sendReply(fd, "366", chanName + " :End of /NAMES list");
 	}
@@ -835,7 +834,6 @@ void Server::handleInvite(int fd, const Command& cmd)
 	std::string inviteMsg = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
 						  + "@" + _clients[fd].getHostname() + " INVITE " + targetNick
 						  + " :" + chanName + "\r\n";
-
 	targetClient->getOutputBuffer() += inviteMsg;
 	notifyPollout(targetClient->getFd());
 }
