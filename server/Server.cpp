@@ -335,7 +335,7 @@ void Server::handleUser(int fd, const Command& cmd)
         sendReply(fd, "462", ":You may not reregister");
         return ;
     }
-    if (cmd.params.empty() || cmd.trailing.empty())
+    if (cmd.params.empty() || cmd.trailing.empty() || cmd.params.size() < 3)
     {
         sendReply(fd, "461", "USER :Not enough parameters");
         return ;
@@ -384,7 +384,6 @@ void Server::handleQuit(int fd, size_t index, const Command& cmd)
 			reason = cmd.params[0];
 		else
 			reason = "Client Quit";
-
 
         std::string quitMsg = ":" + c.getNickname() + "!" + c.getUsername()
                             + "@" + c.getHostname() + " QUIT :" + reason + "\r\n";
@@ -494,6 +493,7 @@ bool Server::isNickInUse(const std::string& nick) const
 {
     return _nick_to_fd.find(nick) != _nick_to_fd.end();
 }
+
 Client* Server::getClientByNick(const std::string& nick)
 {
     std::map<std::string, int>::iterator it = _nick_to_fd.find(nick);
@@ -544,7 +544,6 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 	std::string message = ":" + sender.getNickname() + "!" + sender.getUsername()
 						+ "@" + sender.getHostname() + " PRIVMSG " + target
 						+ " :" + text + "\r\n";
-						
 	if (target[0] == '#' || target[0] == '&')
 	{
 		std::map<std::string, Channel>::iterator it = _channels.find(target);
@@ -896,8 +895,10 @@ void Server::handleMode(int fd, const Command& cmd)
 	{
 		std::string modes = "+";
 		std::string modeParams = "";
-		if (chan.isInviteOnly()) modes += "i";
-		if (chan.isTopicRestricted()) modes += "t";
+		if (chan.isInviteOnly())
+			modes += "i";
+		if (chan.isTopicRestricted())
+			modes += "t";
 		if (chan.hasKey())
 		{
 			modes += "k";
