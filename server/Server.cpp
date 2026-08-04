@@ -502,8 +502,27 @@ Client* Server::getClientByNick(const std::string& nick)
 
     std::map<int, Client>::iterator cit = _clients.find(it->second);
     if (cit == _clients.end())
-        return NULL;
+		return NULL;
     return &(cit->second);
+}
+
+static std::vector<std::string> splitString(const std::string& str, char delimiter)
+{
+	std::vector<std::string> tokens;
+	std::string token;
+	for (size_t i = 0; i < str.length(); i++)
+	{
+		if (str[i] == delimiter)
+		{
+			tokens.push_back(token);
+			token.clear();
+		}
+		else
+			token += str[i];
+	}
+	if (!token.empty())
+		tokens.push_back(token);
+	return tokens;
 }
 
 void Server::notifyPollout(int fd)
@@ -687,9 +706,11 @@ void	Server::handleJoin(int fd, const Command& cmd)
 		std::string names = "";
 		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
 		{
+			if (!names.empty())
+				names += " ";
 			if (chan.isOperator(cit->first))
 				names += "@";
-			names += cit->second->getNickname() + " ";
+			names += cit->second->getNickname();
 		}
 		sendReply(fd, "353", "= " + chanName + " :" + names);
 		sendReply(fd, "366", chanName + " :End of /NAMES list");
