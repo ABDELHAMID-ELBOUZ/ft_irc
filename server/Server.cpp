@@ -502,8 +502,27 @@ Client* Server::getClientByNick(const std::string& nick)
 
     std::map<int, Client>::iterator cit = _clients.find(it->second);
     if (cit == _clients.end())
-        return NULL;
+		return NULL;
     return &(cit->second);
+}
+
+static std::vector<std::string> splitString(const std::string& str, char delimiter)
+{
+	std::vector<std::string> tokens;
+	std::string token;
+	for (size_t i = 0; i < str.length(); i++)
+	{
+		if (str[i] == delimiter)
+		{
+			tokens.push_back(token);
+			token.clear();
+		}
+		else
+			token += str[i];
+	}
+	if (!token.empty())
+		tokens.push_back(token);
+	return tokens;
 }
 
 void Server::notifyPollout(int fd)
@@ -540,68 +559,56 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 		return ;
 	}
 
-	std::string target = cmd.params[0];
-	std::string message = ":" + sender.getNickname() + "!" + sender.getUsername()
-						+ "@" + sender.getHostname() + " PRIVMSG " + target
-						+ " :" + text + "\r\n";
-
-	if (target[0] == '#' || target[0] == '&')
+	std::vector<std::string> targets = splitString(cmd.params[0], ',');
+	for (size_t t = 0; t < targets.size(); t++)
 	{
-		std::map<std::string, Channel>::iterator it = _channels.find(target);
-		if (it == _channels.end())
+		std::string target = targets[t];
+		if (target.empty())
+			continue;
+		
+		std::string message = ":" + sender.getNickname() + "!" + sender.getUsername()
+							+ "@" + sender.getHostname() + " PRIVMSG " + target
+							+ " :" + text + "\r\n";
+		
+		if (target[0] == '#' || target[0] == '&')
 		{
-			sendReply(fd, "401", target + " :No such nick/channel");
-			return ;
-		}
-
-		Channel& chan = it->second;
-		if (!chan.isClientInChannel(fd))
-		{
-			sendReply(fd, "404", target + " :Cannot send to channel");
-			return ;
-		}
-
-		const std::map<int, Client*>& chanClients = chan.getClients();
-		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
-		{
-			if (cit->first != fd)
+			std::map<std::string, Channel>::iterator it = _channels.find(target);
+			if (it == _channels.end())
 			{
-				cit->second->getOutputBuffer() += message;
-				notifyPollout(cit->first);
+				sendReply(fd, "401", target + " :No such nick/channel");
+				continue ; 
+			}
+
+			Channel& chan = it->second;
+			if (!chan.isClientInChannel(fd))
+			{
+				sendReply(fd, "404", target + " :Cannot send to channel");
+				continue ;
+			}
+
+			const std::map<int, Client*>& chanClients = chan.getClients();
+			for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
+			{
+				if (cit->first != fd)
+				{
+					cit->second->getOutputBuffer() += message;
+					notifyPollout(cit->first);
+				}
 			}
 		}
-	}
-	else
-	{
-		Client* recipient = getClientByNick(target);
-		if (!recipient || !recipient->isRegistered())
-		{
-			sendReply(fd, "401", target + " :No such nick/channel");
-			return ;
-		}
-
-		recipient->getOutputBuffer() += message;
-		notifyPollout(recipient->getFd());
-	}
-}
-
-static std::vector<std::string> splitString(const std::string& str, char delimiter)
-{
-	std::vector<std::string> tokens;
-	std::string token;
-	for (size_t i = 0; i < str.length(); i++)
-	{
-		if (str[i] == delimiter)
-		{
-			tokens.push_back(token);
-			token.clear();
-		}
 		else
-			token += str[i];
-	}
-	if (!token.empty())
-		tokens.push_back(token);
-	return tokens;
+		{
+			Client* recipient = getClientByNick(target);
+			if (!recipient || !recipient->isRegistered())
+			{
+				sendReply(fd, "401", target + " :No such nick/channel");
+				continue ;
+			}
+
+			recipient->getOutputBuffer() += message;
+			notifyPollout(recipient->getFd());
+		}
+ 	}
 }
 
 void	Server::handleJoin(int fd, const Command& cmd)
