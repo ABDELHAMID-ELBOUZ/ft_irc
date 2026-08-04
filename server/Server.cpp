@@ -376,7 +376,16 @@ void Server::handleQuit(int fd, size_t index, const Command& cmd)
     if (it != _clients.end())
     {
         Client& c = it->second;
-        std::string reason = cmd.trailing.empty() ? "Client Quit" : cmd.trailing;
+
+        std::string reason;
+		if (cmd.hasTrailing)
+			reason = cmd.trailing;
+		else if (!cmd.params.empty())
+			reason = cmd.params[0];
+		else
+			reason = "Client Quit";
+
+
         std::string quitMsg = ":" + c.getNickname() + "!" + c.getUsername()
                             + "@" + c.getHostname() + " QUIT :" + reason + "\r\n";
         
