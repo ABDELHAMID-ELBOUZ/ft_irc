@@ -537,25 +537,6 @@ void Server::notifyPollout(int fd)
 	}
 }
 
-static std::vector<std::string> splitString(const std::string& str, char delimiter)
-{
-	std::vector<std::string> tokens;
-	std::string token;
-	for (size_t i = 0; i < str.length(); i++)
-	{
-		if (str[i] == delimiter)
-		{
-			tokens.push_back(token);
-			token.clear();
-		}
-		else
-			token += str[i];
-	}
-	if (!token.empty())
-		tokens.push_back(token);
-	return tokens;
-}
-
 void Server::handlePrivmsg(int fd, const Command& cmd)
 {
 	Client& sender = _clients[fd];
