@@ -519,16 +519,22 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 		return ;
 	}
 
-	if (cmd.trailing.empty())
+	std::string text;
+	if (cmd.hasTrailing)
+		text = cmd.trailing;
+	else if (cmd.params.size() > 1)
+		text = cmd.params[1];
+	
+	if (text.empty() && cmd.params.size() <= 1)
 	{
 		sendReply(fd, "412", ":No text to send");
-		return ;
+        return;
 	}
 
 	std::string target = cmd.params[0];
 	std::string message = ":" + sender.getNickname() + "!" + sender.getUsername()
 						+ "@" + sender.getHostname() + " PRIVMSG " + target
-						+ " :" + cmd.trailing + "\r\n";
+						+ " :" + text + "\r\n";
 						
 	if (target[0] == '#' || target[0] == '&')
 	{

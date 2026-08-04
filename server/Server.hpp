@@ -5,6 +5,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <stdexcept>
 #include <iostream>
 #include <unistd.h>    
 #include <poll.h>

@@ -1,10 +1,6 @@
 NAME = ircserv
 
-NAME = ircserv
-OBJ = ./server/Client.o ./server/Server.o ./command/Channel.o main.o ./command/Parser.o
-HEADERS = ./server/Client.hpp ./server/Server.hpp ./command/Channel.hpp ./command/Command.hpp ./command/Parser.hpp
-
-CC = c++ #-fsanitize=address
+CC = c++ -fsanitize=address
 FLAGS = -Wall -Wextra -Werror -std=c++98
 
 OBJ = ./server/Client.o ./server/Server.o main.o ./command/Parser.o ./command/Channel.o
