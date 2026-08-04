@@ -10,6 +10,7 @@ struct Command
     std::string              cmd;
     std::vector<std::string> params;
     std::string              trailing;
+	bool					 hasTrailing;
 };
 
 #endif

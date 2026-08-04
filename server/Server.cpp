@@ -701,7 +701,7 @@ void Server::handleTopic(int fd, const Command& cmd)
         return ;
     }
 
-    if (cmd.trailing.empty())
+    if (cmd.params.size() == 1 && !cmd.hasTrailing)
     {
         if (ch.getTopic().empty())
             sendReply(fd, "331", chanName + " :No topic is set");
@@ -710,17 +710,23 @@ void Server::handleTopic(int fd, const Command& cmd)
         return ;
     }
 
+	std::string newTopic;
+	if (cmd.hasTrailing)
+		newTopic = cmd.trailing;
+	else if (cmd.params.size() > 1)
+		newTopic = cmd.params[1];
+
     if (ch.isTopicRestricted() && !ch.isOperator(fd))
     {
         sendReply(fd, "482", chanName + " :You're not channel operator");
         return ;
     }
 
-    ch.setTopic(cmd.trailing);
+    ch.setTopic(newTopic);
 
     std::string topicMsg = ":" + client.getNickname() + "!" + client.getUsername()
                          + "@" + client.getHostname() + " TOPIC " + chanName
-                         + " :" + cmd.trailing + "\r\n";
+                         + " :" + newTopic + "\r\n";
 
     const std::map<int, Client*>& clients = ch.getClients();
     for (std::map<int, Client*>::const_iterator cit = clients.begin(); cit != clients.end(); ++cit)

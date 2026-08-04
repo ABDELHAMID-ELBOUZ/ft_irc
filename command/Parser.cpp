@@ -68,6 +68,7 @@ Command parseCommand(const std::string& raw)
         if (line[0] == ':')
         {
             result.trailing = line.substr(1);
+			result.hasTrailing = true;
             break;
         }
         
