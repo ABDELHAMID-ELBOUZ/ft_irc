@@ -376,7 +376,15 @@ void Server::handleQuit(int fd, size_t index, const Command& cmd)
     if (it != _clients.end())
     {
         Client& c = it->second;
-        std::string reason = cmd.trailing.empty() ? "Client Quit" : cmd.trailing;
+
+        std::string reason;
+		if (cmd.hasTrailing)
+			reason = cmd.trailing;
+		else if (!cmd.params.empty())
+			reason = cmd.params[0];
+		else
+			reason = "Client Quit";
+
         std::string quitMsg = ":" + c.getNickname() + "!" + c.getUsername()
                             + "@" + c.getHostname() + " QUIT :" + reason + "\r\n";
         
@@ -520,7 +528,13 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 		return ;
 	}
 
-	if (cmd.trailing.empty())
+	std::string text;
+	if (cmd.hasTrailing)
+		text = cmd.trailing;
+	else if (cmd.params.size() > 1)
+		text = cmd.params[1];
+	
+	if (text.empty() && cmd.params.size() <= 1)
 	{
 		sendReply(fd, "412", ":No text to send");
 		return ;
@@ -529,8 +543,8 @@ void Server::handlePrivmsg(int fd, const Command& cmd)
 	std::string target = cmd.params[0];
 	std::string message = ":" + sender.getNickname() + "!" + sender.getUsername()
 						+ "@" + sender.getHostname() + " PRIVMSG " + target
-						+ " :" + cmd.trailing + "\r\n";
-						
+						+ " :" + text + "\r\n";
+
 	if (target[0] == '#' || target[0] == '&')
 	{
 		std::map<std::string, Channel>::iterator it = _channels.find(target);
@@ -703,7 +717,7 @@ void Server::handleTopic(int fd, const Command& cmd)
         return ;
     }
 
-    if (cmd.trailing.empty())
+    if (cmd.params.size() == 1 && !cmd.hasTrailing)
     {
         if (ch.getTopic().empty())
             sendReply(fd, "331", chanName + " :No topic is set");
@@ -712,17 +726,23 @@ void Server::handleTopic(int fd, const Command& cmd)
         return ;
     }
 
+	std::string newTopic;
+	if (cmd.hasTrailing)
+		newTopic = cmd.trailing;
+	else if (cmd.params.size() > 1)
+		newTopic = cmd.params[1];
+
     if (ch.isTopicRestricted() && !ch.isOperator(fd))
     {
         sendReply(fd, "482", chanName + " :You're not channel operator");
         return ;
     }
 
-    ch.setTopic(cmd.trailing);
+    ch.setTopic(newTopic);
 
     std::string topicMsg = ":" + client.getNickname() + "!" + client.getUsername()
                          + "@" + client.getHostname() + " TOPIC " + chanName
-                         + " :" + cmd.trailing + "\r\n";
+                         + " :" + newTopic + "\r\n";
 
     const std::map<int, Client*>& clients = ch.getClients();
     for (std::map<int, Client*>::const_iterator cit = clients.begin(); cit != clients.end(); ++cit)
@@ -742,7 +762,14 @@ void Server::handleKick(int fd, const Command& cmd)
 
 	std::string chanName = cmd.params[0];
 	std::string targetNick = cmd.params[1];
-	std::string reason = cmd.trailing.empty() ? "Kicked by operator" : cmd.trailing;
+
+	std::string reason;
+	if (cmd.hasTrailing)
+		reason = cmd.trailing;
+	else if (cmd.params.size() > 2)
+		reason = cmd.params[2];
+	else
+		reason = "Kicked by operator";
 
 	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
 	if (it == _channels.end())

@@ -5,6 +5,7 @@ Command parseCommand(const std::string& raw)
 {
     Command result;
     std::string line = raw;
+	result.hasTrailing = false;
     
     size_t pos = 0;
     while (pos < line.size() && std::isspace(line[pos]))
@@ -68,6 +69,7 @@ Command parseCommand(const std::string& raw)
         if (line[0] == ':')
         {
             result.trailing = line.substr(1);
+			result.hasTrailing = true;
             break;
         }
         
