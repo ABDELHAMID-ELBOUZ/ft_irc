@@ -752,7 +752,14 @@ void Server::handleKick(int fd, const Command& cmd)
 
 	std::string chanName = cmd.params[0];
 	std::string targetNick = cmd.params[1];
-	std::string reason = cmd.trailing.empty() ? "Kicked by operator" : cmd.trailing;
+
+	std::string reason;
+	if (cmd.hasTrailing)
+		reason = cmd.trailing;
+	else if (cmd.params.size() > 2)
+		reason = cmd.params[2];
+	else
+		reason = "Kicked by operator";
 
 	std::map<std::string, Channel>::iterator it = _channels.find(chanName);
 	if (it == _channels.end())
