@@ -663,7 +663,7 @@ void	Server::handleJoin(int fd, const Command& cmd)
 			chan.addOperator(&client);
 
 		std::string joinMsg = ":" + client.getNickname() + "!" + client.getUsername()
-							+ "@" + client.getHostname() + " JOIN :" + chanName + "\r\n";
+							+ "@" + client.getHostname() + " JOIN " + chanName + "\r\n";
 
 		const std::map<int, Client*>& chanClients = chan.getClients();
 		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++ ) 
@@ -680,9 +680,11 @@ void	Server::handleJoin(int fd, const Command& cmd)
 		std::string names = "";
 		for (std::map<int, Client*>::const_iterator cit = chanClients.begin(); cit != chanClients.end(); cit++)
 		{
+			if (!names.empty())
+				names += " ";
 			if (chan.isOperator(cit->first))
 				names += "@";
-			names += cit->second->getNickname() + " ";
+			names += cit->second->getNickname();
 		}
 
 		sendReply(fd, "353", "= " + chanName + " :" + names);
