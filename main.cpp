@@ -35,7 +35,8 @@ int main(int ac, char **av)
             throw std::runtime_error("Invalid port range.");
         }
         std::string password = av[2];
-
+        if (!password.length())
+            throw std::runtime_error("Invalid password");
         Server server(port, password);
         server.start();
     } 
