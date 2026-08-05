@@ -949,7 +949,7 @@ void Server::handleMode(int fd, const Command& cmd)
 	size_t paramIdx = 0;
 	std::string appliedModes = "";
 	std::string appliedParams = "";
-	char lastSign = '\0';
+	char lastOutputSign = '\0';
 
 	for (size_t i = 0; i < modestring.size(); i++)
 	{
@@ -957,31 +957,34 @@ void Server::handleMode(int fd, const Command& cmd)
 		if (c == '+')
 		{ 
 			adding = true;
-			if (lastSign != '+')
-			{
-				appliedModes += "+";
-				lastSign = '+';
-			}
 			continue ;
 		}
 		if (c == '-')
 		{ 
 			adding = false;
-			if (lastSign != '-')
-			{
-				appliedModes += "-";
-				lastSign = '-';
-			}
 			continue ;
 		}
+
+		char currentSign = adding ? '+' : '-';
+
 		if (c == 'i')
 		{
 			chan.setInviteOnly(adding);
+        	if (currentSign != lastOutputSign)
+        	{
+        	    appliedModes += currentSign;
+        	    lastOutputSign = currentSign;
+        	}
 			appliedModes += "i";
 		} 
 		else if (c == 't')
 		{
 			chan.setTopicRestricted(adding);
+			if (currentSign != lastOutputSign)
+        	{
+        		appliedModes += currentSign;
+            	lastOutputSign = currentSign;
+        	}
 			appliedModes += "t";
 		} 
 		else if (c == 'k')
@@ -989,6 +992,11 @@ void Server::handleMode(int fd, const Command& cmd)
 			if (adding && paramIdx < modeParams.size())
 			{
 				chan.setKey(modeParams[paramIdx]);
+            	if (currentSign != lastOutputSign)
+            	{
+                	appliedModes += currentSign;
+                	lastOutputSign = currentSign;
+            	}
 				appliedModes += "k";
 				appliedParams += " " + modeParams[paramIdx]; 
 				paramIdx++;
@@ -996,6 +1004,11 @@ void Server::handleMode(int fd, const Command& cmd)
 			else if (!adding)
 			{
 				chan.setKey("");
+				if (currentSign != lastOutputSign)
+            	{
+                	appliedModes += currentSign;
+                	lastOutputSign = currentSign;
+            	}
 				appliedModes += "k";
 			}
 			else
@@ -1012,6 +1025,11 @@ void Server::handleMode(int fd, const Command& cmd)
 				if (limit > 0)
 				{
 					chan.setLimit(static_cast<size_t>(limit));
+                	if (currentSign != lastOutputSign)
+                	{
+                	    appliedModes += currentSign;
+                	    lastOutputSign = currentSign;
+                	}
 					appliedModes += "l";
 					appliedParams += " " + modeParams[paramIdx];
 				}
@@ -1020,6 +1038,11 @@ void Server::handleMode(int fd, const Command& cmd)
 			else if (!adding)
 			{
 				chan.setLimit(0);
+            	if (currentSign != lastOutputSign)
+            	{
+            	    appliedModes += currentSign;
+            	    lastOutputSign = currentSign;
+            	}
 				appliedModes += "l";
 			}
 			else
@@ -1041,6 +1064,11 @@ void Server::handleMode(int fd, const Command& cmd)
 						chan.addOperator(targetClient);
 					else
 						chan.removeOperator(targetClient->getFd());
+					if (currentSign != lastOutputSign)
+                	{
+                	    appliedModes += currentSign;
+                	    lastOutputSign = currentSign;
+                	}
 					appliedModes += 'o';
 					appliedParams += " " + modeParams[paramIdx];
 				}
