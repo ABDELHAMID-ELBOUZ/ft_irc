@@ -24,7 +24,12 @@ int main(int ac, char **av)
     try
 	{
         signal(SIGINT,sighandler);
-        int port = atoi(av[1]);
+        for (int i = 0; av[1][i]; i++)
+        {
+            if (!isdigit(av[1][i]))
+                return (std::cerr << "Invalid port range"<< std::endl, 1);
+        }
+        int port = std::atoi(av[1]);
         if (port < 1024 || port > 65535)
 		{
             throw std::runtime_error("Invalid port range.");
