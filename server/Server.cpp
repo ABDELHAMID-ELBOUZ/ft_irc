@@ -988,19 +988,15 @@ void Server::handleMode(int fd, const Command& cmd)
 		{
 			if (adding && paramIdx < modeParams.size())
 			{
-				std::cout << "paramIdx " << paramIdx << "modeParams.size() " << modeParams.size() << "\n";
-				std::cout << "modeP[paramIdx] " << modeParams[paramIdx] << std::endl;
 				chan.setKey(modeParams[paramIdx]);
 				appliedModes += "k";
 				appliedParams += " " + modeParams[paramIdx]; 
 				paramIdx++;
-				std::cout << "--> " << appliedModes << std::endl;
 			}
 			else if (!adding)
 			{
 				chan.setKey("");
 				appliedModes += "k";
-				std::cout << "set ky empty\n";
 			}
 			else
 			{

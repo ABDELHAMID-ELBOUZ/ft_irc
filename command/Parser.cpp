@@ -8,14 +8,14 @@ Command parseCommand(const std::string& raw)
 	result.hasTrailing = false;
     
     size_t pos = 0;
-    while (pos < line.size() && std::isspace(line[pos]))
+    while (pos < line.size() && line[pos] == ' '))
         ++pos;
     if (pos >= line.size())
         return result;
     line = line.substr(pos);
     
     pos = line.size();
-    while (pos > 0 && std::isspace(line[pos - 1]))
+    while (pos > 0 && line[pos - 1] == ' ')
         --pos;
     line = line.substr(0, pos);
     
@@ -34,7 +34,7 @@ Command parseCommand(const std::string& raw)
         line = line.substr(spacePos + 1);
         
         pos = 0;
-        while (pos < line.size() && std::isspace(line[pos]))
+        while (pos < line.size() && line[pos] == ' ')
             ++pos;
         if (pos >= line.size())
             return result;
@@ -59,7 +59,7 @@ Command parseCommand(const std::string& raw)
     while (!line.empty())
     {
         pos = 0;
-        while (pos < line.size() && std::isspace(line[pos]))
+        while (pos < line.size() && line[pos] == ' ')
             ++pos;
 
         if (pos >= line.size())
