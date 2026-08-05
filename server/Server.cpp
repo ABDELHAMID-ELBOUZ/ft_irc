@@ -149,6 +149,9 @@ bool Server::handle_client_read(size_t index)
         if (!raw_command.empty() && raw_command[raw_command.size() - 1] == '\r')
             raw_command.erase(raw_command.size() - 1);
 
+		if (raw_command.size() > 510)
+			raw_command.resize(510);
+		
         if (!raw_command.empty())
         {
             Command cmd = parseCommand(raw_command);
