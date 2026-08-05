@@ -17,10 +17,11 @@
 #include "../command/Command.hpp"
 #include "../command/Parser.hpp"
 #include "../command/Channel.hpp"
+#include <signal.h>
 
+extern int is_signal;
 
 #define BUFFER_SIZE 4096
-
 class Server
 {
     private:

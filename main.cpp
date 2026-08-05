@@ -1,6 +1,19 @@
 #include "./server/Server.hpp"
 
+
+
+void sighandler(int sig)
+{
+    if (sig == SIGINT)
+    {
+        is_signal = 1;
+    }
+}
+
+
 int main(int ac, char **av)
+
+
 {
     if (ac != 3)
 	{
@@ -10,6 +23,7 @@ int main(int ac, char **av)
 
     try
 	{
+        signal(SIGINT,sighandler);
         int port = atoi(av[1]);
         if (port < 1024 || port > 65535)
 		{
@@ -18,7 +32,6 @@ int main(int ac, char **av)
         std::string password = av[2];
 
         Server server(port, password);
-        
         server.start();
     } 
     catch (const std::exception &e)

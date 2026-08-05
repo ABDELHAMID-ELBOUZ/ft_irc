@@ -1,6 +1,6 @@
 #include "Server.hpp"
 
-
+int is_signal = 0;
 Server::Server() : _port(0), _listen_fd(-1), _server_name("ft.irc")
 {
 
@@ -79,12 +79,14 @@ void Server::start()
 
     std::cout << "IRC Server started on port " << _port << "..." << std::endl;
 
-    while (true)
+    while (!is_signal)
     {
         int p = poll(_fd_list.data(), _fd_list.size(), -1);
         if (p < 0)
-            throw std::runtime_error("poll failed");
+		{
 
+            throw std::runtime_error("poll failed");
+		}
         for (size_t i = 0; i < _fd_list.size(); i++)
         {
             if (_fd_list[i].revents & POLLIN)
@@ -189,7 +191,6 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
 {
     if (cmd.cmd.empty())
         return ;
-    
     if (cmd.cmd == "PASS")
         handlePass(fd, cmd);
     else if (cmd.cmd == "NICK")
@@ -198,11 +199,6 @@ void Server::executeCommand(int fd, size_t index, const Command& cmd)
         handleUser(fd, cmd);
     else if (cmd.cmd == "QUIT")
         handleQuit(fd, index, cmd);
-	else if (cmd.cmd == "PING")
-    {
-        std::string token = cmd.params.empty() ? "" : cmd.params[0];
-        sendReply(fd, "PONG", ":" + token);
-    }
 	else
     {
         Client& c = _clients[fd];
