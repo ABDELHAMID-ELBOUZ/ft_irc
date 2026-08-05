@@ -1,6 +1,6 @@
 NAME = ircserv
 
-CC = c++ #-fsanitize=address
+CC = c++ 
 FLAGS = -Wall -Wextra -Werror -std=c++98
 
 OBJ = ./server/Client.o ./server/Server.o main.o ./command/Parser.o ./command/Channel.o

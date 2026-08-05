@@ -8,7 +8,7 @@ Command parseCommand(const std::string& raw)
 	result.hasTrailing = false;
     
     size_t pos = 0;
-    while (pos < line.size() && line[pos] == ' '))
+    while (pos < line.size() && line[pos] == ' ')
         ++pos;
     if (pos >= line.size())
         return result;

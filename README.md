@@ -81,7 +81,6 @@ USER myusername 0 * :My Real Name
 | `USER <user> 0 * :<realname>` | Set username and real name. |
 | `JOIN <#channel>[,<#channel2>] [<key>]` | Join one or more channels. |
 | `PRIVMSG <target> :<message>` | Send a message to a channel or user. |
-| `NOTICE <target> :<message>` | Send a notice (no error replies generated). |
 | `KICK <#channel> <nick> [:reason]` | Remove a user from a channel (operator only). |
 | `INVITE <nick> <#channel>` | Invite a user to a channel. |
 | `TOPIC <#channel> [:new topic]` | View or set the channel topic. |
@@ -110,7 +109,6 @@ Key design choices:
 - [IRC Numerics List](https://defs.ircdocs.horse/defs/numerics.html)
 - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/)
 - [Linux `poll()` manual](https://man7.org/linux/man-pages/man2/poll.2.html)
-- [Modern IRC Client Protocol](https://modern.ircdocs.horse/)
 
 ### AI Usage
 

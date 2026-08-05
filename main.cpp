@@ -1,7 +1,5 @@
 #include "./server/Server.hpp"
 
-
-
 void sighandler(int sig)
 {
     if (sig == SIGINT)
@@ -9,7 +7,6 @@ void sighandler(int sig)
         is_signal = 1;
     }
 }
-
 
 int main(int ac, char **av)
 {
