@@ -933,10 +933,17 @@ void Server::handleMode(int fd, const Command& cmd)
 			modeParams.push_back(cmd.params[i]);
 	}
 
+	if (modestring.empty() || (modestring[0] != '+' && modestring[0] != '-'))
+	{
+		sendReply(fd, "501", ":Unknown MODE flag");
+		return;
+	}
+
 	bool adding = true;
 	size_t paramIdx = 0;
 	std::string appliedModes = "";
 	std::string appliedParams = "";
+	char lastSign = '\0';
 
 	for (size_t i = 0; i < modestring.size(); i++)
 	{
@@ -944,13 +951,21 @@ void Server::handleMode(int fd, const Command& cmd)
 		if (c == '+')
 		{ 
 			adding = true;
-			appliedModes += "+";
+			if (lastSign != '+')
+			{
+				appliedModes += "+";
+				lastSign = '+';
+			}
 			continue ;
 		}
 		if (c == '-')
 		{ 
 			adding = false;
-			appliedModes += '-';
+			if (lastSign != '-')
+			{
+				appliedModes += "-";
+				lastSign = '-';
+			}
 			continue ;
 		}
 		if (c == 'i')
@@ -977,6 +992,11 @@ void Server::handleMode(int fd, const Command& cmd)
 				chan.setKey("");
 				appliedModes += "k";
 			}
+			else
+			{
+				sendReply(fd, "461", "MODE :Not enough parameters");
+				return;
+			}
 		}
 		else if (c == 'l')
 		{
@@ -995,6 +1015,11 @@ void Server::handleMode(int fd, const Command& cmd)
 			{
 				chan.setLimit(0);
 				appliedModes += "l";
+			}
+			else
+			{
+				sendReply(fd, "461", "MODE :Not enough parameters");
+				return ;
 			}
 		}
 		else if (c == 'o')
@@ -1016,7 +1041,10 @@ void Server::handleMode(int fd, const Command& cmd)
 				paramIdx++;
 			}
 			else
+			{
 				sendReply(fd, "461", "MODE :Not enough parameters");
+				return;
+			}
 		}
 		else
 		{
@@ -1025,7 +1053,17 @@ void Server::handleMode(int fd, const Command& cmd)
 		}
 	}
 
-	if (appliedModes.size() > 1 || (appliedModes.size() == 1 && appliedModes[0] != '+' && appliedModes[0] != '-'))
+	bool hasRealMode = false;
+	for (size_t i = 0; i < appliedModes.size(); i++)
+	{
+		if (appliedModes[i] != '+' && appliedModes[i] != '-')
+		{
+			hasRealMode = true;
+			break;
+		}
+	}
+
+	if (hasRealMode)
 	{
 		std::string notify = ":" + _clients[fd].getNickname() + "!" + _clients[fd].getUsername()
 						   + "@" + _clients[fd].getHostname() + " MODE " + target + " " 
