@@ -1,12 +1,12 @@
 #include "Channel.hpp"
 #include <algorithm>
 
-Channel::Channel() : limit(0), inviteOnly(false), topicRestricted(true)
+Channel::Channel() : limit(0), inviteOnly(false), topicRestricted(false)
 {
 	
 }
 
-Channel::Channel(const std::string& name) : name(name), limit(0), inviteOnly(false), topicRestricted(true)
+Channel::Channel(const std::string& name) : name(name), limit(0), inviteOnly(false), topicRestricted(false)
 {
 
 }

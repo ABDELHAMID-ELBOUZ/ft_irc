@@ -879,10 +879,7 @@ void Server::handleMode(int fd, const Command& cmd)
 	std::string target = cmd.params[0];
 	if (target[0] != '#' && target[0] != '&')
 	{
-		if (target != _clients[fd].getNickname())
-			sendReply(fd, "401", target + " :No such nick/channel");
-		else
-			sendReply(fd, "501", ":Unknown MODE flag");
+		sendReply(fd, "501", ":Unknown MODE flag");
 		return ;
 	}
 
@@ -894,6 +891,11 @@ void Server::handleMode(int fd, const Command& cmd)
 	}
 
 	Channel& chan = it->second;
+	if (!chan.isClientInChannel(fd))
+	{
+		sendReply(fd, "442", target + " :You're not on that channel");
+		return ;
+	}
 	if (cmd.params.size() == 1)
 	{
 		std::string modes = "+";
@@ -914,7 +916,8 @@ void Server::handleMode(int fd, const Command& cmd)
             oss << chan.getLimit();
             modeParams += " " + oss.str();
 		}
-
+		if (modes.size() == 1)
+			modes = "";
 		sendReply(fd, "324", target + " " + modes + modeParams);
 		return ;
 	}
@@ -982,15 +985,19 @@ void Server::handleMode(int fd, const Command& cmd)
 		{
 			if (adding && paramIdx < modeParams.size())
 			{
+				std::cout << "paramIdx " << paramIdx << "modeParams.size() " << modeParams.size() << "\n";
+				std::cout << "modeP[paramIdx] " << modeParams[paramIdx] << std::endl;
 				chan.setKey(modeParams[paramIdx]);
 				appliedModes += "k";
 				appliedParams += " " + modeParams[paramIdx]; 
 				paramIdx++;
+				std::cout << "--> " << appliedModes << std::endl;
 			}
 			else if (!adding)
 			{
 				chan.setKey("");
 				appliedModes += "k";
+				std::cout << "set ky empty\n";
 			}
 			else
 			{
