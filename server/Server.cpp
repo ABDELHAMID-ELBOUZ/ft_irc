@@ -462,10 +462,7 @@ bool Server::isValidNick(const std::string& nick) const
         return false;
 
     char first = nick[0];
-    bool firstOk = std::isalpha(first)
-                || first == '[' || first == ']' || first == '\\'
-                || first == '`' || first == '_' || first == '^'
-                || first == '{' || first == '|' || first == '}';
+    bool firstOk = std::isalpha(first);
 
     if (!firstOk)
         return false;
